@@ -1,6 +1,7 @@
 import { HeadContent, Link, Scripts, createRootRoute } from '@tanstack/react-router'
 import { Toaster } from '#/components/ui/sonner'
 import { TooltipProvider } from '#/components/ui/tooltip'
+import { SiteFooter } from '#/components/SiteFooter'
 import { SiteHeader } from '#/components/SiteHeader'
 import { getMe } from '#/server/auth.functions'
 import { VaultProvider } from '#/vault/VaultProvider'
@@ -58,15 +59,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <TooltipProvider>
             <SiteHeader me={me} />
             <div className="flex-1">{children}</div>
-            <footer className="border-t">
-              <div className="mx-auto max-w-6xl px-4 py-6 text-xs text-muted-foreground">
-                <p className="max-w-[72ch]">
-                  Smurf Ladder isn’t endorsed by Riot Games and doesn’t reflect the views or opinions of Riot Games or anyone officially
-                  involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or
-                  registered trademarks of Riot Games, Inc.
-                </p>
-              </div>
-            </footer>
+            <SiteFooter />
           </TooltipProvider>
           <Toaster position="bottom-center" />
         </VaultProvider>
