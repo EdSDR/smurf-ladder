@@ -101,8 +101,9 @@ export async function wrapForMember(key: CryptoKey, publicKeySpki: string | Cryp
   return toB64(await subtle().wrapKey('raw', key, pub, { name: 'RSA-OAEP' }))
 }
 
-export function unwrapWithPrivateKey(wrappedB64: string, privateKey: CryptoKey) {
-  return subtle().unwrapKey('raw', fromB64(wrappedB64), privateKey, { name: 'RSA-OAEP' }, AES, true, ['encrypt', 'decrypt'])
+/** Group keys must stay extractable (members wrap them for newcomers); per-login keys never need to. */
+export function unwrapWithPrivateKey(wrappedB64: string, privateKey: CryptoKey, extractable = false) {
+  return subtle().unwrapKey('raw', fromB64(wrappedB64), privateKey, { name: 'RSA-OAEP' }, AES, extractable, ['encrypt', 'decrypt'])
 }
 
 export type Credential = { login: string; password: string; note?: string }
@@ -118,9 +119,33 @@ export async function decryptJson<T>(ciphertext: string, iv: string, key: Crypto
   return JSON.parse(new TextDecoder().decode(plain)) as T
 }
 
+/**
+ * Proves a public key belongs to our private key by wrapping a throwaway key with one and
+ * unwrapping with the other. Stops a tampered server from showing us someone else's key.
+ */
+export async function keysMatch(publicKeySpki: string, privateKey: CryptoKey): Promise<boolean> {
+  try {
+    const probe = await generateAesKey()
+    await unwrapWithPrivateKey(await wrapForMember(probe, publicKeySpki), privateKey)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Fingerprint of the group key itself. Every member should see the same one. */
+export async function groupKeyFingerprint(groupKey: CryptoKey): Promise<string> {
+  const raw = await subtle().exportKey('raw', groupKey)
+  return hexGroups(new Uint8Array(await subtle().digest('SHA-256', raw)))
+}
+
+/** 128 bits, as eight groups of four hex digits. */
+function hexGroups(digest: Uint8Array) {
+  const hex = [...digest.slice(0, 16)].map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+  return hex.match(/.{4}/g)!.join(' ')
+}
+
 /** Short, human-comparable digest of a public key, read aloud or pasted in Discord before approving. */
 export async function fingerprint(spkiB64: string): Promise<string> {
-  const digest = new Uint8Array(await subtle().digest('SHA-256', fromB64(spkiB64)))
-  const hex = [...digest.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase()
-  return hex.match(/.{4}/g)!.join(' ')
+  return hexGroups(new Uint8Array(await subtle().digest('SHA-256', fromB64(spkiB64))))
 }

@@ -81,7 +81,7 @@ function SetupForm() {
           required
         />
         <p id="passphrase-hint" className="text-xs text-muted-foreground">
-          At least {MIN_PASSPHRASE} characters. A few random words works well.
+          At least {MIN_PASSPHRASE} characters. Four or more random words is much stronger than a short password.
         </p>
       </div>
       <div className="grid gap-1.5">
@@ -128,7 +128,13 @@ function Unlocked() {
         <p className="text-sm text-muted-foreground">
           Your key fingerprint is <Fingerprint value={myFp} />
         </p>
-        {!vault.hasGroupAccess && (
+        {vault.groupFingerprint && (
+          <p className="text-sm text-muted-foreground">
+            Group key fingerprint <Fingerprint value={vault.groupFingerprint} />. Everyone in the group should see the same one.
+          </p>
+        )}
+        <GroupKeyNotice />
+        {!vault.hasGroupAccess && vault.groupAlert !== 'mismatch' && (
           <div className="mt-2 rounded-md border bg-panel p-4 text-sm">
             <p className="font-semibold">Waiting for a member to approve you</p>
             <p className="mt-1 text-muted-foreground">
@@ -147,6 +153,27 @@ function Unlocked() {
         </div>
       </section>
       {vault.hasGroupAccess && <PendingApprovals />}
+    </div>
+  )
+}
+
+function GroupKeyNotice() {
+  const vault = useVault()
+  if (!vault.groupAlert) return null
+  const text = {
+    new: 'This is the first time this browser sees the group key. Check once that the fingerprint above matches what another member sees.',
+    rotated: 'The group key changed because a member was removed. Check the new fingerprint with another member.',
+    mismatch:
+      'The server sent a different group key than the one this browser trusted, without a rotation. Shared logins are blocked here until you check the fingerprint with another member.',
+  }[vault.groupAlert]
+  return (
+    <div className="mt-2 rounded-md border bg-panel p-4 text-sm">
+      <p className={vault.groupAlert === 'mismatch' ? 'font-semibold' : undefined}>{text}</p>
+      {vault.groupAlert === 'mismatch' && (
+        <Button size="sm" variant="outline" className="mt-3" onClick={() => vault.trustGroupKey()}>
+          Fingerprints match, trust this key
+        </Button>
+      )}
     </div>
   )
 }

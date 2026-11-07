@@ -46,3 +46,23 @@ export async function forgetKeys() {
     await tx('readwrite', (s) => s.clear())
   } catch {}
 }
+
+/**
+ * The group-key fingerprint this browser has trusted. A different key at the same version means
+ * the server swapped it, so the vault refuses it instead of encrypting new logins under it.
+ */
+export type GroupPin = { version: number; fingerprint: string }
+
+export async function loadGroupPin(memberId: number): Promise<GroupPin | null> {
+  try {
+    return (await tx<GroupPin | undefined>('readonly', (s) => s.get(`group:${memberId}`))) ?? null
+  } catch {
+    return null
+  }
+}
+
+export async function saveGroupPin(memberId: number, pin: GroupPin) {
+  try {
+    await tx('readwrite', (s) => s.put(pin, `group:${memberId}`))
+  } catch {}
+}

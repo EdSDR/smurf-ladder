@@ -15,8 +15,8 @@
 		{
 			"binding": "DB",
 			"database_name": "smurf-ladder",
-			// Forks: replace with the id printed by `wrangler d1 create smurf-ladder`.
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			// No database_id on purpose: `wrangler deploy` reuses the database already bound to the
+			// Worker, or finds/creates one named "smurf-ladder". Nobody's deployment is baked into the repo.
 			"migrations_dir": "drizzle"
 		}
 	],

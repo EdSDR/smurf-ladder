@@ -1,6 +1,8 @@
 import { asc, eq } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
+import { UserError } from '#/lib/errors'
 import type { Account, Member } from '#/db/schema'
+import { currentGroupVersion } from './vault.server'
 
 const { accounts, credentials, members } = schema
 export const REFRESH_COOLDOWN_MS = 2 * 60 * 1000
@@ -80,13 +82,43 @@ export async function memberAccounts(): Promise<MemberAccount[]> {
 
 export async function requireAccount(id: number) {
   const [account] = await getDb().select().from(accounts).where(eq(accounts.id, id))
-  if (!account) throw new Error('That account no longer exists.')
+  if (!account) throw new UserError('That account no longer exists.')
   return account
 }
 
 export function assertOwner(account: Account, member: Member) {
   if (account.ownerId !== member.id && member.role !== 'admin') {
-    throw new Error('Only the member who added this account can change it.')
+    throw new UserError('Only the member who added this account can change it.')
   }
 }
 
+// Anonymous visitors share one cached copy per Worker instance, so hammering the public page
+// can't burn through the free D1 read quota.
+let publicCache: { at: number; accounts: PublicAccount[] } | null = null
+const PUBLIC_CACHE_MS = 60_000
+
+export async function publicAccounts() {
+  if (publicCache && Date.now() - publicCache.at < PUBLIC_CACHE_MS) return publicCache.accounts
+  const rows = await getDb().select().from(accounts).orderBy(asc(accounts.gameName))
+  publicCache = { at: Date.now(), accounts: rows.map(toPublic) }
+  return publicCache.accounts
+}
+
+type SealedInput = { keyRef: string; wrappedItemKey: string | null }
+
+/**
+ * A login's encryption must match how it's shared: shared ones under the *current* group key
+ * (so nobody keeps writing under a key a removed member still holds), private ones under the
+ * owner's own item key.
+ */
+export async function assertSealedCorrectly(shared: boolean, cred: SealedInput | null) {
+  if (!cred) return
+  if (shared) {
+    const version = await currentGroupVersion()
+    if (version === null || cred.keyRef !== `group:${version}` || cred.wrappedItemKey) {
+      throw new UserError('The group key changed since this page loaded. Reload and save again.')
+    }
+  } else if (cred.keyRef !== 'owner' || !cred.wrappedItemKey) {
+    throw new UserError('This login wasn’t encrypted as private. Reload and save again.')
+  }
+}

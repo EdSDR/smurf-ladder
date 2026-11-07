@@ -6,6 +6,8 @@ import {
   encryptJson,
   fingerprint,
   generateAesKey,
+  groupKeyFingerprint,
+  keysMatch,
   openPrivateKey,
   unwrapWithPrivateKey,
   wrapForMember,
@@ -31,8 +33,25 @@ describe('member keys', () => {
   it('gives a stable, short fingerprint', async () => {
     const { bundle } = await createMemberKeys('correct horse battery')
     const fp = await fingerprint(bundle.publicKey)
-    expect(fp).toMatch(/^[0-9A-F]{4}( [0-9A-F]{4}){3}$/)
+    expect(fp).toMatch(/^[0-9A-F]{4}( [0-9A-F]{4}){7}$/)
     expect(await fingerprint(bundle.publicKey)).toBe(fp)
+  })
+})
+
+describe('tamper checks', () => {
+  it('detects a public key that isn’t ours', async () => {
+    const me = await createMemberKeys('my passphrase')
+    const other = await createMemberKeys('someone else')
+    expect(await keysMatch(me.bundle.publicKey, me.privateKey)).toBe(true)
+    expect(await keysMatch(other.bundle.publicKey, me.privateKey)).toBe(false)
+  })
+
+  it('gives every holder of the group key the same group fingerprint', async () => {
+    const group = await generateAesKey()
+    const alice = await createMemberKeys('alice passphrase')
+    const aliceCopy = await unwrapWithPrivateKey(await wrapForMember(group, alice.bundle.publicKey), alice.privateKey, true)
+    expect(await groupKeyFingerprint(aliceCopy)).toBe(await groupKeyFingerprint(group))
+    expect(await groupKeyFingerprint(await generateAesKey())).not.toBe(await groupKeyFingerprint(group))
   })
 })
 
@@ -43,7 +62,7 @@ describe('credentials', () => {
     const group = await generateAesKey()
 
     // Alice approves Bob: wraps the group key to his public key.
-    const bobGroupKey = await unwrapWithPrivateKey(await wrapForMember(group, bob.bundle.publicKey), bob.privateKey)
+    const bobGroupKey = await unwrapWithPrivateKey(await wrapForMember(group, bob.bundle.publicKey), bob.privateKey, true)
 
     const sealed = await sealCredential(cred, true, { privateKey: alice.privateKey, publicKey: alice.bundle.publicKey, groupKey: group, groupVersion: 1 })
     expect(sealed.keyRef).toBe('group:1')

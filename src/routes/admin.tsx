@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import {
@@ -15,7 +15,8 @@ import {
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { inviteMember, listMembers, listSharedCredentials, removeMemberAndRotate } from '#/server/vault.functions'
-import { decryptJson, encryptJson, generateAesKey, wrapForMember } from '#/vault/crypto'
+import { decryptJson, encryptJson, fingerprint, generateAesKey, groupKeyFingerprint, wrapForMember } from '#/vault/crypto'
+import { saveGroupPin } from '#/vault/keystore'
 import { useVault } from '#/vault/VaultProvider'
 
 export const Route = createFileRoute('/admin')({
@@ -80,7 +81,7 @@ function Admin() {
                 {m.status === 'invited' ? 'Invited, hasn’t signed in yet' : !m.publicKey ? 'No vault yet' : m.hasGroupKey ? 'Has vault access' : 'Waiting for vault approval'}
               </div>
             </div>
-            {m.id !== me!.id && <RemoveMember member={m} groupVersion={data.groupVersion} members={data.members} />}
+            {m.id !== me!.id && <RemoveMember member={m} meId={me!.id} groupVersion={data.groupVersion} members={data.members} />}
           </li>
         ))}
       </ul>
@@ -92,12 +93,19 @@ function Admin() {
  * Removing someone rotates the group key in this browser: shared logins are decrypted with
  * the old key, re-encrypted with a new one, and the new key is wrapped for everyone who stays.
  */
-function RemoveMember({ member, groupVersion, members }: { member: MemberRow; groupVersion: number | null; members: MemberRow[] }) {
+function RemoveMember({ member, meId, groupVersion, members }: { member: MemberRow; meId: number; groupVersion: number | null; members: MemberRow[] }) {
   const vault = useVault()
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const needsRotation = groupVersion !== null
   const canRotate = !needsRotation || (vault.status === 'unlocked' && !!vault.groupKey)
+  // Everyone who keeps access gets the new key. Listing their fingerprints lets the admin spot a
+  // key the server slipped in.
+  const stay = members.filter((m) => m.id !== member.id && m.hasGroupKey && m.publicKey)
+  const [fps, setFps] = useState<Record<number, string>>({})
+  useEffect(() => {
+    Promise.all(stay.map(async (m) => [m.id, await fingerprint(m.publicKey!)] as const)).then((pairs) => setFps(Object.fromEntries(pairs)))
+  }, [members]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function remove() {
     setBusy(true)
@@ -110,11 +118,14 @@ function RemoveMember({ member, groupVersion, members }: { member: MemberRow; gr
         const credentials = await Promise.all(
           shared.map(async (c) => ({ accountId: c.accountId, ...(await encryptJson(await decryptJson(c.ciphertext, c.iv, oldKey), newKey)) })),
         )
-        const stay = members.filter((m) => m.id !== member.id && m.hasGroupKey && m.publicKey)
         const grants = await Promise.all(stay.map(async (m) => ({ memberId: m.id, wrappedGroupKey: await wrapForMember(newKey, m.publicKey!) })))
         payload = { memberId: member.id, newVersion: groupVersion + 1, grants, credentials }
+        await removeMemberAndRotate({ data: payload })
+        // This browser made the new key, so it trusts it without a "rotated" notice.
+        await saveGroupPin(meId, { version: groupVersion + 1, fingerprint: await groupKeyFingerprint(newKey) })
+      } else {
+        await removeMemberAndRotate({ data: payload })
       }
-      await removeMemberAndRotate({ data: payload })
       await vault.reload()
       toast.success(`Removed ${member.name ?? 'member'}`)
       await router.invalidate()
@@ -141,6 +152,19 @@ function RemoveMember({ member, groupVersion, members }: { member: MemberRow; gr
           </DialogDescription>
         </DialogHeader>
         {!canRotate && <p className="text-sm">Unlock your vault first so this browser can re-encrypt the shared logins.</p>}
+        {needsRotation && canRotate && (
+          <div className="text-sm">
+            <p className="mb-2 text-muted-foreground">These members get the new key. Their fingerprints should match what they see on their vault page:</p>
+            <ul className="grid gap-1">
+              {stay.map((m) => (
+                <li key={m.id} className="flex justify-between gap-3">
+                  <span>{m.name ?? `Discord ${m.discordId}`}</span>
+                  <code className="nums font-sans text-xs text-muted-foreground">{fps[m.id] ?? '…'}</code>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="ghost">Keep them</Button>

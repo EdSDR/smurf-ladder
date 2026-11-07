@@ -73,6 +73,17 @@ export function CredentialView({ accountId }: { accountId: number }) {
   }
   if (vault.status === 'locked') return <UnlockForm />
   if (vault.status !== 'unlocked') return <p className="text-sm text-muted-foreground">Opening vault…</p>
+  if (vault.groupAlert === 'mismatch') {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Shared logins are blocked on this browser: the group key changed unexpectedly.{' '}
+        <Link to="/vault" className="text-foreground underline underline-offset-4">
+          Check it on the vault page
+        </Link>
+        .
+      </p>
+    )
+  }
   if (error) return <p className="text-sm text-muted-foreground">{error}</p>
   if (!cred) return <p className="text-sm text-muted-foreground">Decrypting…</p>
   return (

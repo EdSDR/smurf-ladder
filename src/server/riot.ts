@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers'
+import { UserError } from '#/lib/errors'
 
-export class RiotError extends Error {
+export class RiotError extends UserError {
   constructor(
     public status: number,
     message: string,

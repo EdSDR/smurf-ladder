@@ -1,6 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, inArray, isNotNull, like } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, like, sql } from 'drizzle-orm'
 import { z } from 'zod'
+import { UserError } from '#/lib/errors'
+import { input } from '#/lib/validate'
 import { getDb, schema } from '#/db'
 import { adminMiddleware, memberMiddleware } from './middleware'
 import { currentGroupVersion, myGrant } from './vault.server'
@@ -33,7 +35,7 @@ const b64 = z.string().max(4000)
 
 export const setupVault = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
-  .validator(
+  .validator(input(
     z.object({
       publicKey: b64,
       wrappedPrivateKey: b64,
@@ -43,12 +45,12 @@ export const setupVault = createServerFn({ method: 'POST' })
       // Sent only by the first member to set up a vault: the brand-new group key, wrapped to themselves.
       wrappedGroupKey: b64.nullable(),
     }),
-  )
+  ))
   .handler(async ({ data, context }) => {
     const db = getDb()
     const me = context.member
     const version = await currentGroupVersion()
-    if (data.wrappedGroupKey && version !== null) throw new Error('The group vault already exists.')
+    if (data.wrappedGroupKey && version !== null) throw new UserError('The group vault already exists.')
 
     await db
       .update(schema.members)
@@ -92,15 +94,19 @@ export const listPendingGrants = createServerFn({ method: 'GET' })
 
 export const grantGroupKey = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
-  .validator(z.object({ memberId: z.number().int(), keyVersion: z.number().int(), wrappedGroupKey: b64 }))
+  .validator(input(z.object({ memberId: z.number().int(), keyVersion: z.number().int(), wrappedGroupKey: b64 })))
   .handler(async ({ data, context }) => {
     const version = await currentGroupVersion()
-    if (version !== data.keyVersion) throw new Error('The group key changed. Reload and try again.')
-    if (!(await myGrant(context.member.id, version))) throw new Error('Unlock the vault before approving schema.members.')
+    if (version !== data.keyVersion) throw new UserError('The group key changed. Reload and try again.')
+    if (!(await myGrant(context.member.id, version))) throw new UserError('Unlock the vault before approving members.')
+    // Only members who are actually waiting can be approved, and only once: nobody can pre-empt a
+    // real approval with a junk key.
+    const [target] = await getDb().select().from(schema.members).where(eq(schema.members.id, data.memberId))
+    if (!target || target.status !== 'active' || !target.publicKey) throw new UserError('That member isn’t waiting for access.')
+    if (await myGrant(target.id, version)) throw new UserError('That member was already approved.')
     await getDb()
       .insert(schema.groupKeyGrants)
       .values({ memberId: data.memberId, keyVersion: version, wrappedGroupKey: data.wrappedGroupKey, grantedBy: context.member.id })
-      .onConflictDoNothing()
   })
 
 // ---- Admin -------------------------------------------------------------------
@@ -132,42 +138,42 @@ export const listMembers = createServerFn({ method: 'GET' })
 
 export const inviteMember = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(z.object({ discordId: z.string().regex(/^\d{15,21}$/, 'Discord user IDs are 15–21 digits.') }))
+  .validator(input(z.object({ discordId: z.string().regex(/^\d{15,21}$/, 'Discord user IDs are 15–21 digits.') })))
   .handler(async ({ data }) => {
     await getDb().insert(schema.members).values({ discordId: data.discordId }).onConflictDoNothing()
   })
 
 /**
  * Removing a member rotates the group key: the admin's browser re-encrypts every shared login
- * under a new key and wraps it for the remaining schema.members, so the removed member's copy is useless.
+ * under a new key and wraps it for the remaining members, so the removed member's copy is useless.
  */
 export const removeMemberAndRotate = createServerFn({ method: 'POST' })
   .middleware([adminMiddleware])
-  .validator(
+  .validator(input(
     z.object({
       memberId: z.number().int(),
       newVersion: z.number().int(),
       grants: z.array(z.object({ memberId: z.number().int(), wrappedGroupKey: b64 })),
       credentials: z.array(z.object({ accountId: z.number().int(), ciphertext: z.string().max(8000), iv: z.string().max(64) })),
     }),
-  )
+  ))
   .handler(async ({ data, context }) => {
-    if (data.memberId === context.member.id) throw new Error("You can't remove yourself.")
+    if (data.memberId === context.member.id) throw new UserError("You can't remove yourself.")
     const db = getDb()
     const version = await currentGroupVersion()
     const removedOwns = db.select({ id: schema.accounts.id }).from(schema.accounts).where(eq(schema.accounts.ownerId, data.memberId))
     type Stmt = Parameters<typeof db.batch>[0][number]
     const stmts: Stmt[] = [
-      // Their private logins were only readable by them; their schema.accounts move to the admin.
+      // Their private logins were only readable by them; their accounts move to the admin.
       db.delete(schema.credentials).where(and(eq(schema.credentials.keyRef, 'owner'), inArray(schema.credentials.accountId, removedOwns))),
       db.update(schema.accounts).set({ ownerId: context.member.id }).where(eq(schema.accounts.ownerId, data.memberId)),
       db.delete(schema.members).where(eq(schema.members.id, data.memberId)),
     ]
     if (version !== null) {
-      if (data.newVersion !== version + 1) throw new Error('The group key changed. Reload and try again.')
+      if (data.newVersion !== version + 1) throw new UserError('The group key changed. Reload and try again.')
       const shared = await db.select({ id: schema.credentials.accountId }).from(schema.credentials).where(like(schema.credentials.keyRef, 'group:%'))
       const sent = new Set(data.credentials.map((c) => c.accountId))
-      if (shared.some((c) => !sent.has(c.id))) throw new Error('Not every shared login was re-encrypted. Reload and try again.')
+      if (shared.some((c) => !sent.has(c.id))) throw new UserError('Not every shared login was re-encrypted. Reload and try again.')
       const ref = `group:${data.newVersion}`
       stmts.push(
         db.update(schema.vaultMeta).set({ groupKeyVersion: data.newVersion }).where(eq(schema.vaultMeta.id, 1)),
@@ -180,7 +186,24 @@ export const removeMemberAndRotate = createServerFn({ method: 'POST' })
         ),
       )
     }
-    await db.batch(stmts as [Stmt, ...Stmt[]])
+    if (version !== null) {
+      const ref = `group:${data.newVersion}`
+      // Abort the whole batch (a primary-key clash on vault_meta) if a shared login was saved under
+      // the old key while this ran, or someone else rotated first. Nothing is left half-rotated.
+      stmts.push(
+        db.run(sql`INSERT INTO vault_meta (id, group_key_version) SELECT 1, 0 WHERE EXISTS (
+          SELECT 1 FROM credentials WHERE key_ref LIKE 'group:%' AND key_ref != ${ref}
+        ) OR (SELECT group_key_version FROM vault_meta WHERE id = 1) != ${data.newVersion}`),
+      )
+    }
+    try {
+      await db.batch(stmts as [Stmt, ...Stmt[]])
+    } catch (err) {
+      if (String(err).includes('UNIQUE') || String(err).includes('PRIMARY')) {
+        throw new UserError('Someone saved a shared login while this ran. Reload and try again.')
+      }
+      throw err
+    }
   })
 
 /** Ciphertexts of every shared login, for the admin's browser to re-encrypt during key rotation. */

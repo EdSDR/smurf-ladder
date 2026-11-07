@@ -2,8 +2,6 @@
 
 Every League of Legends account your group shares, on one ladder. Pick a tier and see which accounts can play there. No more logging in to each one to check its rank.
 
-**Live:** [<your-worker>.workers.dev](https://<your-worker>.workers.dev)
-
 ![The ladder: accounts pinned on their tier, with the list below](docs/ladder.png)
 
 - **The ladder.** Every account is pinned on its tier, from Iron to Challenger, for Solo/Duo or Flex. Click a tier to filter.
@@ -41,12 +39,22 @@ your public key ──wraps──▶ per-item AES key   ──encrypts──▶ 
 ```
 
 - Each member chooses a **vault passphrase** (separate from Discord). Their browser generates an RSA-OAEP-3072 keypair and seals the private key with a key derived from the passphrase. The server stores only the public key and the sealed private key.
-- **Shared logins** are encrypted with one group key. The first member to set up a vault creates it. New members appear as *waiting*. An existing member compares the newcomer's **key fingerprint** over Discord, then approves them, which wraps the group key to the newcomer's public key. The fingerprint check means a compromised server can't sneak in its own key.
+- **Shared logins** are encrypted with one group key. The first member to set up a vault creates it. New members appear as *waiting*. An existing member compares the newcomer's **key fingerprint** over Discord, then approves them, which wraps the group key to the newcomer's public key.
 - **Private logins** get a fresh key wrapped only to their owner.
-- **Removing a member** rotates the group key. The admin's browser re-encrypts every shared login under a new key and grants it to everyone who stays.
+- **Removing a member** rotates the group key. The admin's browser re-encrypts every shared login under a new key and wraps it for everyone who stays, listing their fingerprints first.
 - **"Remember this device"** keeps your private key in IndexedDB as a *non-extractable* CryptoKey. The page can use it, but can't read its bytes out.
+- **Tamper checks.** Your browser verifies that the public key the server returns matches your private key. It also remembers the group key's fingerprint and refuses a different key at the same version, so a planted key blocks shared logins instead of silently collecting new ones. The vault page shows the group-key fingerprint, which should be identical for every member.
 
-**What it protects against:** a leaked database, a curious Cloudflare account holder, someone reading the Worker's logs. **What it doesn't:** a malicious deployment of the site's own JavaScript (as with any web-based vault), or a member who already saw a password before being removed. Change those Riot passwords if that matters. **A forgotten passphrase** means your private logins are gone for good. Shared ones can be re-granted by another member after you set up a new vault.
+**What it protects against:** anyone who can *read* the data, such as a leaked database dump, the Worker's logs or the D1 console. They get ciphertext only.
+
+**What it detects, but can't prevent:** someone who can *write* to the database planting their own keys. Your browser catches a swapped group key and a mismatched own key. A new member's first approval and a rotation still rely on comparing fingerprints over Discord, so do it.
+
+**What it doesn't protect against:**
+- Whoever can deploy the Worker can ship JavaScript that reads logins as you type them. That's true of every web-based vault.
+- A member who already saw a password before being removed. Change those Riot passwords if that matters.
+- **A forgotten passphrase.** Your private logins are gone for good. Shared ones can be re-granted by another member after you set up a new vault.
+
+See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## Self-hosting
 
@@ -55,20 +63,22 @@ You need a Cloudflare account, a Discord application and a Riot API key. All thr
 1. **Riot API key.** Sign in at [developer.riotgames.com](https://developer.riotgames.com). The development key works right away but expires every 24 hours. For a group of friends, register a *Personal API Key* (it doesn't expire).
 2. **Discord app.** In the [Discord developer portal](https://discord.com/developers/applications), create an application. Under OAuth2, add the redirect `https://<your-domain>/auth/discord/callback` (and `http://localhost:5173/auth/discord/callback` for local dev). Copy the client ID and secret.
 3. **Your Discord user ID.** Turn on Developer Mode in Discord, then right-click yourself and choose *Copy User ID*. This account becomes the first admin.
-4. **Install and configure:**
+4. **Install and deploy:**
 
    ```sh
    pnpm install
-   pnpm wrangler d1 create smurf-ladder   # paste the database_id into wrangler.jsonc
-   pnpm db:migrate:remote
+   pnpm wrangler login
+   pnpm run deploy            # creates the Worker and a D1 database named smurf-ladder
+   pnpm db:migrate:remote     # creates the tables
    pnpm wrangler secret put RIOT_API_KEY
    pnpm wrangler secret put DISCORD_CLIENT_ID
    pnpm wrangler secret put DISCORD_CLIENT_SECRET
    pnpm wrangler secret put ADMIN_DISCORD_ID
-   pnpm run deploy
    ```
 
-5. Sign in, set up your vault, then invite friends from **Members** by their Discord user IDs.
+   `wrangler.jsonc` has no database ID: Wrangler finds or creates the database by name on deploy, so your deployment details never need to live in the repo.
+
+5. Add `https://<your-worker>.workers.dev/auth/discord/callback` as a redirect in the Discord portal, then sign in, set up your vault, and invite friends from **Members** by their Discord user IDs.
 
 The region is BR by default. For another server, change `RIOT_PLATFORM` (e.g. `euw1`, `na1`) and `RIOT_REGION` (`europe`, `americas`, `asia`) in `wrangler.jsonc`.
 

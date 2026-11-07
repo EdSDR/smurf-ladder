@@ -1,14 +1,17 @@
 import { createServerFn } from '@tanstack/react-start'
-import { asc, desc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { UserError } from '#/lib/errors'
+import { input } from '#/lib/validate'
 import { getDb, schema } from '#/db'
 import {
   REFRESH_COOLDOWN_MS,
   assertOwner,
+  assertSealedCorrectly,
   memberAccounts,
+  publicAccounts,
   queue,
   requireAccount,
-  toPublic,
 } from './accounts.server'
 import * as riot from './riot'
 import { Budget, refreshAccount } from './refresh'
@@ -21,15 +24,15 @@ export type { MemberAccount, PublicAccount, QueueRank } from './accounts.server'
 export const listAccounts = createServerFn({ method: 'GET' }).handler(async () => {
   const member = await getSessionMember()
   if (member) return { kind: 'member' as const, accounts: await memberAccounts() }
-  const rows = await getDb().select().from(schema.accounts).orderBy(asc(schema.accounts.gameName))
-  return { kind: 'public' as const, accounts: rows.map(toPublic) }
+  return { kind: 'public' as const, accounts: await publicAccounts() }
 })
+
 
 const riotIdInput = z.object({ riotId: z.string().max(40) })
 
 export const lookupRiotId = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
-  .validator(riotIdInput)
+  .validator(input(riotIdInput))
   .handler(async ({ data }) => {
     const id = riot.parseRiotId(data.riotId)
     if (!id) return { ok: false as const, error: 'Use the full Riot ID, like Name#BR1.' }
@@ -61,12 +64,13 @@ export type EncryptedCredential = z.infer<typeof encryptedCredential>
 
 export const addAccount = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
-  .validator(riotIdInput.extend({ shared: z.boolean(), credential: encryptedCredential.nullable() }))
+  .validator(input(riotIdInput.extend({ shared: z.boolean(), credential: encryptedCredential.nullable() })))
   .handler(async ({ data, context }) => {
+    await assertSealedCorrectly(data.shared, data.credential)
     const id = riot.parseRiotId(data.riotId)
-    if (!id) throw new Error('Use the full Riot ID, like Name#BR1.')
+    if (!id) throw new UserError('Use the full Riot ID, like Name#BR1.')
     const found = await riot.accountByRiotId(id.gameName, id.tagLine)
-    if (!found) throw new Error(`No BR account found for ${id.gameName}#${id.tagLine}.`)
+    if (!found) throw new UserError(`No BR account found for ${id.gameName}#${id.tagLine}.`)
     const summoner = await riot.summonerByPuuid(found.puuid)
     const db = getDb()
     const [account] = await db
@@ -83,7 +87,7 @@ export const addAccount = createServerFn({ method: 'POST' })
       })
       .onConflictDoNothing()
       .returning()
-    if (!account) throw new Error('That account is already on the ladder.')
+    if (!account) throw new UserError('That account is already on the ladder.')
     if (data.credential) await db.insert(schema.credentials).values({ accountId: account.id, ...data.credential })
     // Lookup and summoner calls already used a few requests of this invocation's 50.
     await refreshAccount(account, new Budget(44))
@@ -94,11 +98,11 @@ const accountIdInput = z.object({ accountId: z.number().int() })
 
 export const getAccountDetail = createServerFn({ method: 'GET' })
   .middleware([memberMiddleware])
-  .validator(accountIdInput)
+  .validator(input(accountIdInput))
   .handler(async ({ data }) => {
     const all = await memberAccounts()
     const account = all.find((a) => a.id === data.accountId)
-    if (!account) throw new Error('That account no longer exists.')
+    if (!account) throw new UserError('That account no longer exists.')
     const history = await getDb()
       .select({
         queue: schema.rankSnapshots.queue,
@@ -116,14 +120,14 @@ export const getAccountDetail = createServerFn({ method: 'GET' })
     return { account, history: history.reverse() }
   })
 
-/** Ciphertext only. Shared schema.credentials go to any member, private ones only to their owner. */
+/** Ciphertext only. Shared credentials go to any member, private ones only to their owner. */
 export const getCredential = createServerFn({ method: 'GET' })
   .middleware([memberMiddleware])
-  .validator(accountIdInput)
+  .validator(input(accountIdInput))
   .handler(async ({ data, context }) => {
     const account = await requireAccount(data.accountId)
     if (!account.shared && account.ownerId !== context.member.id) {
-      throw new Error('This login is private to the member who added it.')
+      throw new UserError('This login is private to the member who added it.')
     }
     const [cred] = await getDb().select().from(schema.credentials).where(eq(schema.credentials.accountId, data.accountId))
     return cred ? { ciphertext: cred.ciphertext, iv: cred.iv, keyRef: cred.keyRef, wrappedItemKey: cred.wrappedItemKey } : null
@@ -131,10 +135,11 @@ export const getCredential = createServerFn({ method: 'GET' })
 
 export const saveCredential = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
-  .validator(accountIdInput.extend({ shared: z.boolean(), credential: encryptedCredential.nullable() }))
+  .validator(input(accountIdInput.extend({ shared: z.boolean(), credential: encryptedCredential.nullable() })))
   .handler(async ({ data, context }) => {
     const account = await requireAccount(data.accountId)
     assertOwner(account, context.member)
+    await assertSealedCorrectly(data.shared, data.credential)
     const db = getDb()
     await db.update(schema.accounts).set({ shared: data.shared }).where(eq(schema.accounts.id, account.id))
     if (data.credential) {
@@ -150,7 +155,7 @@ export const saveCredential = createServerFn({ method: 'POST' })
 
 export const deleteAccount = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
-  .validator(accountIdInput)
+  .validator(input(accountIdInput))
   .handler(async ({ data, context }) => {
     const account = await requireAccount(data.accountId)
     assertOwner(account, context.member)
@@ -159,10 +164,10 @@ export const deleteAccount = createServerFn({ method: 'POST' })
 
 export const refreshNow = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
-  .validator(accountIdInput)
+  .validator(input(accountIdInput))
   .handler(async ({ data }) => {
     const account = await requireAccount(data.accountId)
     const wait = account.refreshedAt + REFRESH_COOLDOWN_MS - Date.now()
-    if (wait > 0) throw new Error(`Refreshed moments ago. Try again in ${Math.ceil(wait / 1000)}s.`)
+    if (wait > 0) throw new UserError(`Refreshed moments ago. Try again in ${Math.ceil(wait / 1000)}s.`)
     await refreshAccount(account, new Budget(45))
   })

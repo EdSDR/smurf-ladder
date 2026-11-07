@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getVaultState, setupVault } from '#/server/vault.functions'
-import { createMemberKeys, generateAesKey, openPrivateKey, unwrapWithPrivateKey, wrapForMember } from './crypto'
-import { forgetKeys, loadPrivateKey, savePrivateKey } from './keystore'
+import { createMemberKeys, generateAesKey, groupKeyFingerprint, keysMatch, openPrivateKey, unwrapWithPrivateKey, wrapForMember } from './crypto'
+import { forgetKeys, loadGroupPin, loadPrivateKey, saveGroupPin, savePrivateKey } from './keystore'
 import type { SealedCredential } from './credentials'
 import { openCredential, sealCredential } from './credentials'
 import type { Credential } from './crypto'
@@ -10,7 +10,14 @@ type VaultState = Awaited<ReturnType<typeof getVaultState>>
 
 export type VaultStatus = 'signed-out' | 'loading' | 'no-vault' | 'locked' | 'unlocked'
 
-type Unlocked = { privateKey: CryptoKey; groupKey: CryptoKey | null }
+/**
+ * - new: first time this browser sees the group key; compare its fingerprint with the group once.
+ * - rotated: the key changed with a version bump (a member was removed); compare again.
+ * - mismatch: a different key at the same version. Refused, because the server may have swapped it.
+ */
+export type GroupKeyAlert = 'new' | 'rotated' | 'mismatch' | null
+
+type Unlocked = { privateKey: CryptoKey; groupKey: CryptoKey | null; groupFingerprint: string | null; groupAlert: GroupKeyAlert }
 
 type VaultContextValue = {
   status: VaultStatus
@@ -19,6 +26,10 @@ type VaultContextValue = {
   groupVersion: number | null
   hasGroupAccess: boolean
   groupKey: CryptoKey | null
+  groupFingerprint: string | null
+  groupAlert: GroupKeyAlert
+  /** After checking the fingerprint with the group: trust the key the server now offers. */
+  trustGroupKey: () => Promise<void>
   setup: (passphrase: string, remember: boolean) => Promise<void>
   unlock: (passphrase: string, remember: boolean) => Promise<void>
   lock: (forgetDevice?: boolean) => Promise<void>
@@ -39,14 +50,33 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
   }, [])
   const [loading, setLoading] = useState(!!memberId)
 
-  const openGroupKey = useCallback(async (s: VaultState, privateKey: CryptoKey) => {
-    if (!s.wrappedGroupKey) return null
-    try {
-      return await unwrapWithPrivateKey(s.wrappedGroupKey, privateKey)
-    } catch {
-      return null
-    }
-  }, [])
+  /** Unwraps the group key and checks it against the fingerprint this browser trusted before. */
+  const openGroupKey = useCallback(
+    async (s: VaultState, privateKey: CryptoKey, trustNew = false): Promise<Omit<Unlocked, 'privateKey'>> => {
+      const none = { groupKey: null, groupFingerprint: null, groupAlert: null }
+      if (!s.wrappedGroupKey || s.groupVersion === null || !memberId) return none
+      let groupKey: CryptoKey
+      try {
+        groupKey = await unwrapWithPrivateKey(s.wrappedGroupKey, privateKey, true)
+      } catch {
+        return none
+      }
+      const fp = await groupKeyFingerprint(groupKey)
+      const pin = await loadGroupPin(memberId)
+      const current = { version: s.groupVersion, fingerprint: fp }
+      if (!pin || trustNew) {
+        await saveGroupPin(memberId, current)
+        return { groupKey, groupFingerprint: fp, groupAlert: trustNew ? null : 'new' }
+      }
+      if (pin.fingerprint === fp) return { groupKey, groupFingerprint: fp, groupAlert: null }
+      if (s.groupVersion > pin.version) {
+        await saveGroupPin(memberId, current)
+        return { groupKey, groupFingerprint: fp, groupAlert: 'rotated' }
+      }
+      return { groupKey: null, groupFingerprint: fp, groupAlert: 'mismatch' }
+    },
+    [memberId],
+  )
 
   const reload = useCallback(async () => {
     if (!memberId) return
@@ -58,7 +88,11 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
     }
     // Reuse the in-memory key, else a remembered one; otherwise the vault stays locked.
     const privateKey = keysRef.current?.privateKey ?? (await loadPrivateKey(memberId, s.keys.publicKey))
-    if (privateKey) setKeys({ privateKey, groupKey: await openGroupKey(s, privateKey) })
+    if (privateKey && (await keysMatch(s.keys.publicKey, privateKey))) {
+      setKeys({ privateKey, ...(await openGroupKey(s, privateKey)) })
+    } else {
+      setKeys(null)
+    }
   }, [memberId, openGroupKey, setKeys])
 
   useEffect(() => {
@@ -89,6 +123,12 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
       groupVersion: state?.groupVersion ?? null,
       hasGroupAccess: !!keys?.groupKey,
       groupKey: keys?.groupKey ?? null,
+      groupFingerprint: keys?.groupFingerprint ?? null,
+      groupAlert: keys?.groupAlert ?? null,
+      async trustGroupKey() {
+        if (!keys || !state) return
+        setKeys({ privateKey: keys.privateKey, ...(await openGroupKey(state, keys.privateKey, true)) })
+      },
       reload,
       async setup(passphrase, remember) {
         if (!memberId) throw new Error('Sign in first.')
@@ -102,14 +142,24 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
         }
         await setupVault({ data: { ...bundle, wrappedGroupKey } })
         if (remember) await savePrivateKey(memberId, bundle.publicKey, privateKey)
-        setKeys({ privateKey, groupKey })
-        setState(await getVaultState())
+        const fresh = await getVaultState()
+        setState(fresh)
+        if (groupKey) {
+          const fp = await groupKeyFingerprint(groupKey)
+          await saveGroupPin(memberId, { version: fresh.groupVersion ?? 1, fingerprint: fp })
+          setKeys({ privateKey, groupKey, groupFingerprint: fp, groupAlert: null })
+        } else {
+          setKeys({ privateKey, groupKey: null, groupFingerprint: null, groupAlert: null })
+        }
       },
       async unlock(passphrase, remember) {
         if (!memberId || !state?.keys) throw new Error('Set up your vault first.')
         const privateKey = await openPrivateKey(passphrase, state.keys)
+        if (!(await keysMatch(state.keys.publicKey, privateKey))) {
+          throw new Error('Your vault keys don’t match what the server sent. Don’t save logins until an admin checks the deployment.')
+        }
         if (remember) await savePrivateKey(memberId, state.keys.publicKey, privateKey)
-        setKeys({ privateKey, groupKey: await openGroupKey(state, privateKey) })
+        setKeys({ privateKey, ...(await openGroupKey(state, privateKey)) })
       },
       async lock(forgetDevice = false) {
         if (forgetDevice) await forgetKeys()

@@ -1,9 +1,11 @@
 import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
-import { and, eq, gt } from 'drizzle-orm'
+import { and, eq, gt, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import type { Member } from '#/db/schema'
 
-const COOKIE = 'sl_session'
+// __Host- pins the cookie to this exact origin over HTTPS (no subdomain can set or read it).
+// Plain-HTTP localhost can't use the prefix, so dev keeps the bare name.
+const COOKIE = import.meta.env.PROD ? '__Host-sl_session' : 'sl_session'
 const TTL_MS = 30 * 24 * 60 * 60 * 1000
 const RENEW_BELOW_MS = 15 * 24 * 60 * 60 * 1000
 
@@ -44,7 +46,7 @@ export async function destroySession() {
       .delete(schema.sessions)
       .where(eq(schema.sessions.tokenHash, await sha256Hex(token)))
   }
-  deleteCookie(COOKIE, { path: '/' })
+  deleteCookie(COOKIE, { path: '/', secure: import.meta.env.PROD })
 }
 
 /** The signed-in, active member for this request, or null. */
@@ -67,4 +69,8 @@ export async function getSessionMember(): Promise<Member | null> {
     setCookie(COOKIE, token, cookieOptions(new Date(expiresAt)))
   }
   return row.member
+}
+
+export async function purgeExpiredSessions() {
+  await getDb().delete(schema.sessions).where(lt(schema.sessions.expiresAt, Date.now()))
 }
