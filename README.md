@@ -2,6 +2,8 @@
 
 Every League of Legends account your group shares, on one ladder. Pick a tier and see which accounts can play there. No more logging in to each one to check its rank.
 
+**Live:** [<your-worker>.workers.dev](https://<your-worker>.workers.dev)
+
 ![The ladder: accounts pinned on their tier, with the list below](docs/ladder.png)
 
 - **The ladder.** Every account is pinned on its tier, from Iron to Challenger, for Solo/Duo or Flex. Click a tier to filter.
