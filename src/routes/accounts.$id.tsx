@@ -254,7 +254,7 @@ function EditLogin({ accountId, shared: initialShared, hasCredentials }: { accou
     setBusy(true)
     try {
       const share = shared && !shareBlocked
-      const has = cred.login || cred.password
+      const has = cred.login || cred.password || cred.note
       const credential = has ? await vault.seal({ login: cred.login, password: cred.password, note: cred.note || undefined }, share) : null
       await saveCredential({ data: { accountId, shared: share, credential } })
       toast.success(has ? 'Login saved' : 'Login removed')
@@ -286,14 +286,14 @@ function EditLogin({ accountId, shared: initialShared, hasCredentials }: { accou
           <LoginFields {...cred} onChange={(p) => setCred((c) => ({ ...c, ...p }))} />
           <ShareSwitch shared={shared && !shareBlocked} onChange={setShared} disabledReason={shareBlocked} />
           <div className="flex gap-2">
-            <Button onClick={save} disabled={busy || (!!(cred.login || cred.password) && (!cred.login || !cred.password))}>
+            <Button onClick={save} disabled={busy}>
               {busy ? 'Saving…' : 'Save login'}
             </Button>
             <Button variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>
           </div>
-          {hasCredentials && <p className="text-xs text-muted-foreground">Clear both fields and save to delete the login.</p>}
+          {hasCredentials && <p className="text-xs text-muted-foreground">Clear every field and save to delete the login.</p>}
         </div>
       ) : (
         <Button variant="outline" onClick={start}>

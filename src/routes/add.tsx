@@ -31,7 +31,8 @@ function AddAccount() {
   const [cred, setCred] = useState({ login: '', password: '', note: '' })
   const [shared, setShared] = useState(true)
 
-  const hasLogin = !!(cred.login || cred.password)
+  // Any one field is enough to save: a login without a password is fine.
+  const hasLogin = !!(cred.login || cred.password || cred.note)
   const needsVault = hasLogin && vault.status !== 'unlocked'
   const shareBlocked = vault.status === 'unlocked' && !vault.hasGroupAccess ? 'Sharing unlocks once a member approves your vault.' : undefined
 
@@ -138,7 +139,7 @@ function AddAccount() {
           </section>
 
           <div className="flex gap-2">
-            <Button onClick={save} disabled={busy || needsVault || (hasLogin && (!cred.login || !cred.password))}>
+            <Button onClick={save} disabled={busy || needsVault}>
               {busy ? 'Adding…' : 'Add account'}
             </Button>
             <Button variant="ghost" asChild>

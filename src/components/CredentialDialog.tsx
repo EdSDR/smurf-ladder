@@ -77,8 +77,8 @@ export function CredentialView({ accountId }: { accountId: number }) {
   if (!cred) return <p className="text-sm text-muted-foreground">Decrypting…</p>
   return (
     <div className="grid gap-3">
-      <CopyField label="Login" value={cred.login} />
-      <CopyField label="Password" value={cred.password} secret />
+      {cred.login && <CopyField label="Login" value={cred.login} />}
+      {cred.password && <CopyField label="Password" value={cred.password} secret />}
       {cred.note && <p className="text-sm whitespace-pre-wrap text-muted-foreground">{cred.note}</p>}
     </div>
   )

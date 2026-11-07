@@ -20,7 +20,7 @@ export function LoginFields({
         <Input id="login" autoComplete="off" value={login} onChange={(e) => onChange({ login: e.target.value })} />
       </div>
       <div className="grid gap-1.5">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">Password (optional)</Label>
         <Input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => onChange({ password: e.target.value })} />
       </div>
       <div className="grid gap-1.5 sm:col-span-2">
