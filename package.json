@@ -2,6 +2,10 @@
   "name": "smurf-ladder",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22.12"
+  },
   "imports": {
     "#/*": "./src/*"
   },
