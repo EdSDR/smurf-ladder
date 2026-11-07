@@ -1,46 +1,101 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import type { Account } from '#/db/schema'
+import { DECAY_WINDOW_DAYS, decayRules, estimateBank } from '#/lib/decay'
 import * as riot from './riot'
 import { queueState, rankChanged } from './snapshots'
 
-const { accounts, rankSnapshots } = schema
+const { accounts, rankSnapshots, rankedGames } = schema
 
-/** Free plan allows 50 subrequests per invocation; each account costs 3–5 Riot calls. */
-export const CRON_BATCH = 9
-const CLAIM_TTL_MS = 3 * 60 * 60 * 1000
-const RIOT_ID_CHECK_MS = 24 * 60 * 60 * 1000
+const DAY = 86_400_000
+const RIOT_ID_CHECK_MS = DAY
 
-export async function refreshAccount(account: Account): Promise<void> {
+/**
+ * The free Workers plan allows 50 outbound requests per invocation. A budget is shared by every
+ * Riot call in one run, so a big backlog of match lookups can't blow through the limit.
+ */
+export class Budget {
+  constructor(public left: number) {}
+  take(n = 1) {
+    if (this.left < n) return false
+    this.left -= n
+    return true
+  }
+}
+
+export const CRON_BUDGET = 48
+/** Base cost of one refresh: league entries + live game + one match list per Diamond+ queue. */
+const BASE_COST = 4
+
+type Queue = 'solo' | 'flex'
+
+/** When the account entered its current decay tier group (Diamond, or Master and up), if we saw it. */
+async function enteredTierAt(accountId: number, queue: Queue, group: 'diamond' | 'apex'): Promise<number | null> {
+  const rows = await getDb()
+    .select({ tier: rankSnapshots.tier, takenAt: rankSnapshots.takenAt })
+    .from(rankSnapshots)
+    .where(and(eq(rankSnapshots.accountId, accountId), eq(rankSnapshots.queue, queue)))
+    .orderBy(desc(rankSnapshots.takenAt))
+    .limit(200)
+  let entered: number | null = null
+  for (const row of rows) {
+    if (decayRules(row.tier)?.group !== group) return entered
+    entered = row.takenAt
+  }
+  return null // never seen outside this group, so we don't know when it got here
+}
+
+/** Caches new ranked games for one queue and returns the estimated bank. */
+async function updateDecay(account: Account, queue: Queue, tier: string | null, budget: Budget, now: number) {
+  const rules = decayRules(tier)
+  if (!rules) return { bank: null, pending: false }
+  const db = getDb()
+  const since = now - DECAY_WINDOW_DAYS * DAY
+
+  const ids = await riot.rankedMatchIds(account.puuid, queue, since)
+  const known = new Set(
+    (
+      await db
+        .select({ matchId: rankedGames.matchId })
+        .from(rankedGames)
+        .where(and(eq(rankedGames.accountId, account.id), eq(rankedGames.queue, queue)))
+    ).map((r) => r.matchId),
+  )
+  let pending = false
+  for (const matchId of ids.filter((id) => !known.has(id))) {
+    if (!budget.take()) {
+      pending = true
+      break
+    }
+    const endedAt = await riot.matchEndedAt(matchId)
+    if (endedAt) await db.insert(rankedGames).values({ accountId: account.id, matchId, queue, endedAt }).onConflictDoNothing()
+  }
+
+  const games = await db
+    .select({ endedAt: rankedGames.endedAt })
+    .from(rankedGames)
+    .where(and(eq(rankedGames.accountId, account.id), eq(rankedGames.queue, queue), inArray(rankedGames.matchId, ids.length ? ids : [''])))
+  const bank = estimateBank({
+    rules,
+    games: games.map((g) => g.endedAt),
+    enteredTierAt: await enteredTierAt(account.id, queue, rules.group),
+    now,
+  })
+  return { bank, pending }
+}
+
+export async function refreshAccount(account: Account, budget = new Budget(CRON_BUDGET)): Promise<void> {
   const db = getDb()
   const now = Date.now()
+  budget.take(2)
 
-  const [entries, gameStart, matchId] = await Promise.all([
-    riot.leagueEntries(account.puuid),
-    riot.activeGameStart(account.puuid),
-    riot.lastRankedMatchId(account.puuid),
-  ])
-
-  const update: Partial<Account> = { refreshedAt: now }
-
+  const [entries, gameStart] = await Promise.all([riot.leagueEntries(account.puuid), riot.activeGameStart(account.puuid)])
   const solo = riot.pickQueue(entries, 'RANKED_SOLO_5x5')
   const flex = riot.pickQueue(entries, 'RANKED_FLEX_SR')
-  const snapshots: (typeof rankSnapshots.$inferInsert)[] = []
-  for (const [queue, entry] of [['solo', solo], ['flex', flex]] as const) {
-    if (rankChanged(queueState(account, queue), entry)) {
-      snapshots.push({
-        accountId: account.id,
-        queue,
-        tier: entry!.tier,
-        rank: entry!.rank,
-        lp: entry!.leaguePoints,
-        wins: entry!.wins,
-        losses: entry!.losses,
-        takenAt: now,
-      })
-    }
-  }
-  Object.assign(update, {
+
+  const update: Partial<Account> = {
+    refreshedAt: now,
+    inGameSince: gameStart,
     soloTier: solo?.tier ?? null,
     soloRank: solo?.rank ?? null,
     soloLp: solo?.leaguePoints ?? null,
@@ -51,38 +106,53 @@ export async function refreshAccount(account: Account): Promise<void> {
     flexLp: flex?.leaguePoints ?? null,
     flexWins: flex?.wins ?? null,
     flexLosses: flex?.losses ?? null,
-  })
-
-  // A claim ends when the game it was for ends, or after 3 hours.
-  const gameJustEnded = account.inGameSince && !gameStart
-  update.inGameSince = gameStart
-  if (account.claimedAt && (gameJustEnded || now - account.claimedAt > CLAIM_TTL_MS)) {
-    update.claimedBy = null
-    update.claimedAt = null
   }
 
-  if (matchId && matchId !== account.lastRankedMatchId) {
-    update.lastRankedMatchId = matchId
-    update.lastRankedAt = await riot.matchEndedAt(matchId)
+  // Snapshots first: a promotion recorded now feeds the decay estimate below.
+  const snapshots: (typeof rankSnapshots.$inferInsert)[] = []
+  for (const [queue, entry] of [['solo', solo], ['flex', flex]] as const) {
+    if (entry && rankChanged(queueState(account, queue), entry)) {
+      snapshots.push({
+        accountId: account.id,
+        queue,
+        tier: entry.tier,
+        rank: entry.rank,
+        lp: entry.leaguePoints,
+        wins: entry.wins,
+        losses: entry.losses,
+        takenAt: now,
+      })
+    }
+  }
+  if (snapshots.length) await db.insert(rankSnapshots).values(snapshots)
+
+  for (const [queue, entry] of [['solo', solo], ['flex', flex]] as const) {
+    if (decayRules(entry?.tier)) budget.take()
+    const { bank, pending } = await updateDecay(account, queue, entry?.tier ?? null, budget, now)
+    if (queue === 'solo') Object.assign(update, { soloBank: bank, soloDecayPending: pending })
+    else Object.assign(update, { flexBank: bank, flexDecayPending: pending })
   }
 
-  if (now - account.riotIdCheckedAt > RIOT_ID_CHECK_MS) {
+  if (now - account.riotIdCheckedAt > RIOT_ID_CHECK_MS && budget.take()) {
     const current = await riot.accountByPuuid(account.puuid)
     if (current) Object.assign(update, { gameName: current.gameName, tagLine: current.tagLine })
     update.riotIdCheckedAt = now
   }
 
   await db.update(accounts).set(update).where(eq(accounts.id, account.id))
-  if (snapshots.length) await db.insert(rankSnapshots).values(snapshots)
+  await db.delete(rankedGames).where(and(eq(rankedGames.accountId, account.id), lt(rankedGames.endedAt, now - (DECAY_WINDOW_DAYS + 2) * DAY)))
 }
 
-export async function refreshStalest(limit = CRON_BATCH): Promise<number> {
+/** Refreshes the stalest accounts until the run's request budget is spent. */
+export async function refreshStalest(): Promise<number> {
   const db = getDb()
-  const stale = await db.select().from(accounts).orderBy(asc(accounts.refreshedAt)).limit(limit)
+  const budget = new Budget(CRON_BUDGET)
+  const stale = await db.select().from(accounts).orderBy(asc(accounts.refreshedAt)).limit(12)
   let done = 0
   for (const account of stale) {
+    if (budget.left < BASE_COST) break
     try {
-      await refreshAccount(account)
+      await refreshAccount(account, budget)
       done++
     } catch (err) {
       console.error(`refresh failed for ${account.gameName}#${account.tagLine}`, err)

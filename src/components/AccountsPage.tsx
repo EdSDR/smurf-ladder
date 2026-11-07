@@ -6,15 +6,18 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Switch } from '#/components/ui/switch'
 import type { Me } from '#/server/auth.functions'
+import { DECAY_SOON_DAYS } from '#/lib/decay'
 import { TIER_META, isTier, rankScore, tierIndex } from '#/lib/tiers'
 import { cn } from '#/lib/utils'
 import { AccountRow, type Row } from './AccountRow'
+import { decaysSoon } from './DecayText'
 import { Ladder, UNRANKED, type Queue } from './Ladder'
 
 export const accountsSearch = z.object({
   tiers: z.string().optional(),
   queue: z.enum(['solo', 'flex']).optional(),
   free: z.boolean().optional(),
+  decay: z.boolean().optional(),
   shared: z.boolean().optional(),
   q: z.string().optional(),
 })
@@ -52,38 +55,38 @@ export function AccountsPage({ accounts, me, search, scope }: Props) {
         const tier = a[queue]?.tier
         const step = isTier(tier) ? tier : UNRANKED
         if (selected.length && !selected.includes(step)) return false
-        if (search.free && (a.inGame || a.claimedBy)) return false
+        if (search.free && a.inGame) return false
+        if (search.decay && !decaysSoon(a[queue], a.refreshedAt)) return false
         if (search.shared && !(a.shared && a.hasCredentials)) return false
         if (needle && !`${a.gameName}#${a.tagLine}`.toLowerCase().includes(needle)) return false
         return true
       })
       .sort((x, y) => rankScore(y[queue]?.tier ?? null, y[queue]?.rank ?? null, y[queue]?.lp ?? null) - rankScore(x[queue]?.tier ?? null, x[queue]?.rank ?? null, x[queue]?.lp ?? null))
-  }, [scoped, queue, selected.join(), search.free, search.shared, search.q]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [scoped, queue, selected.join(), search.free, search.decay, search.shared, search.q]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const range = tierRange(scoped, queue)
   const toggleTier = (t: string) => {
     const next = selected.includes(t) ? selected.filter((s) => s !== t) : [...selected, t]
     update({ tiers: next.length ? next.join(',') : undefined })
   }
-  const filtering = selected.length > 0 || search.free || search.shared || !!search.q
+  const filtering = selected.length > 0 || search.free || search.decay || search.shared || !!search.q
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 pt-8 pb-20 sm:pt-12">
       <section aria-labelledby="ladder-title" className="mb-8">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 id="ladder-title" className="wide text-2xl leading-[1.05] font-extrabold tracking-tight text-balance sm:text-[3.25rem]">
-              {scoped.length === 0
-                ? scope === 'mine'
-                  ? 'You haven’t added any accounts'
-                  : 'No accounts on the ladder yet'
-                : `${scoped.length} ${scoped.length === 1 ? 'account' : 'accounts'}${range ? `, ${range}` : ''}`}
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              {queue === 'solo' ? 'Solo/Duo' : 'Flex'} ranks on BR. Pick a tier to see which accounts can play there.
-            </p>
-          </div>
-          <div className="flex rounded-md border p-0.5" role="group" aria-label="Queue">
+        {/* The queue toggle sits on its own row so it doesn't move when the headline's length changes. */}
+        <div className="mb-6">
+          <h1 id="ladder-title" className="wide text-2xl leading-[1.05] font-extrabold tracking-tight text-balance sm:text-[3.25rem]">
+            {scoped.length === 0
+              ? scope === 'mine'
+                ? 'You haven’t added any accounts'
+                : 'No accounts on the ladder yet'
+              : `${scoped.length} ${scoped.length === 1 ? 'account' : 'accounts'}${range ? `, ${range}` : ''}`}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {queue === 'solo' ? 'Solo/Duo' : 'Flex'} ranks on BR. Pick a tier to see which accounts can play there.
+          </p>
+          <div className="mt-5 inline-flex rounded-md border p-0.5" role="group" aria-label="Queue">
             {(['solo', 'flex'] as const).map((q) => (
               <button
                 key={q}
@@ -116,7 +119,11 @@ export function AccountsPage({ accounts, me, search, scope }: Props) {
             <>
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={!!search.free} onCheckedChange={(v) => update({ free: v || undefined })} />
-                Free right now
+                Not in game
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={!!search.decay} onCheckedChange={(v) => update({ decay: v || undefined })} />
+                Decays within {DECAY_SOON_DAYS} days
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <Switch checked={!!search.shared} onCheckedChange={(v) => update({ shared: v || undefined })} />
@@ -125,7 +132,7 @@ export function AccountsPage({ accounts, me, search, scope }: Props) {
             </>
           )}
           {filtering && (
-            <Button variant="ghost" size="sm" className="ml-auto" onClick={() => update({ tiers: undefined, free: undefined, shared: undefined, q: undefined })}>
+            <Button variant="ghost" size="sm" className="ml-auto" onClick={() => update({ tiers: undefined, free: undefined, decay: undefined, shared: undefined, q: undefined })}>
               <XIcon />
               Clear filters
             </Button>

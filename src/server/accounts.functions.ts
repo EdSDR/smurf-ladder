@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { and, asc, desc, eq } from 'drizzle-orm'
+import { asc, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, schema } from '#/db'
 import {
@@ -11,13 +11,13 @@ import {
   toPublic,
 } from './accounts.server'
 import * as riot from './riot'
-import { refreshAccount } from './refresh'
+import { Budget, refreshAccount } from './refresh'
 import { memberMiddleware } from './middleware'
 import { getSessionMember } from './session'
 
 export type { MemberAccount, PublicAccount, QueueRank } from './accounts.server'
 
-/** Anonymous visitors get rank data only; members also see owners, claims and credential flags. */
+/** Anonymous visitors get rank data only; members also see owners and credential flags. */
 export const listAccounts = createServerFn({ method: 'GET' }).handler(async () => {
   const member = await getSessionMember()
   if (member) return { kind: 'member' as const, accounts: await memberAccounts() }
@@ -85,7 +85,8 @@ export const addAccount = createServerFn({ method: 'POST' })
       .returning()
     if (!account) throw new Error('That account is already on the ladder.')
     if (data.credential) await db.insert(schema.credentials).values({ accountId: account.id, ...data.credential })
-    await refreshAccount(account)
+    // Lookup and summoner calls already used a few requests of this invocation's 50.
+    await refreshAccount(account, new Budget(44))
     return { id: account.id }
   })
 
@@ -156,25 +157,6 @@ export const deleteAccount = createServerFn({ method: 'POST' })
     await getDb().delete(schema.accounts).where(eq(schema.accounts.id, account.id))
   })
 
-export const setClaim = createServerFn({ method: 'POST' })
-  .middleware([memberMiddleware])
-  .validator(accountIdInput.extend({ claim: z.boolean() }))
-  .handler(async ({ data, context }) => {
-    const account = await requireAccount(data.accountId)
-    const db = getDb()
-    if (data.claim) {
-      if (account.claimedBy && account.claimedBy !== context.member.id) {
-        throw new Error('Someone else is already on this account.')
-      }
-      await db.update(schema.accounts).set({ claimedBy: context.member.id, claimedAt: Date.now() }).where(eq(schema.accounts.id, account.id))
-    } else {
-      await db
-        .update(schema.accounts)
-        .set({ claimedBy: null, claimedAt: null })
-        .where(and(eq(schema.accounts.id, account.id), eq(schema.accounts.claimedBy, context.member.id)))
-    }
-  })
-
 export const refreshNow = createServerFn({ method: 'POST' })
   .middleware([memberMiddleware])
   .validator(accountIdInput)
@@ -182,5 +164,5 @@ export const refreshNow = createServerFn({ method: 'POST' })
     const account = await requireAccount(data.accountId)
     const wait = account.refreshedAt + REFRESH_COOLDOWN_MS - Date.now()
     if (wait > 0) throw new Error(`Refreshed moments ago. Try again in ${Math.ceil(wait / 1000)}s.`)
-    await refreshAccount(account)
+    await refreshAccount(account, new Budget(45))
   })

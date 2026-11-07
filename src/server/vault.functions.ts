@@ -161,7 +161,6 @@ export const removeMemberAndRotate = createServerFn({ method: 'POST' })
       // Their private logins were only readable by them; their schema.accounts move to the admin.
       db.delete(schema.credentials).where(and(eq(schema.credentials.keyRef, 'owner'), inArray(schema.credentials.accountId, removedOwns))),
       db.update(schema.accounts).set({ ownerId: context.member.id }).where(eq(schema.accounts.ownerId, data.memberId)),
-      db.update(schema.accounts).set({ claimedBy: null, claimedAt: null }).where(eq(schema.accounts.claimedBy, data.memberId)),
       db.delete(schema.members).where(eq(schema.members.id, data.memberId)),
     ]
     if (version !== null) {

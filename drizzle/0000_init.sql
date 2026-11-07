@@ -17,16 +17,15 @@ CREATE TABLE `accounts` (
 	`flex_lp` integer,
 	`flex_wins` integer,
 	`flex_losses` integer,
-	`last_ranked_match_id` text,
-	`last_ranked_at` integer,
+	`solo_bank` real,
+	`flex_bank` real,
+	`solo_decay_pending` integer DEFAULT false NOT NULL,
+	`flex_decay_pending` integer DEFAULT false NOT NULL,
 	`in_game_since` integer,
-	`claimed_by` integer,
-	`claimed_at` integer,
 	`refreshed_at` integer DEFAULT 0 NOT NULL,
 	`riot_id_checked_at` integer DEFAULT 0 NOT NULL,
 	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL,
-	FOREIGN KEY (`owner_id`) REFERENCES `members`(`id`) ON UPDATE no action ON DELETE cascade,
-	FOREIGN KEY (`claimed_by`) REFERENCES `members`(`id`) ON UPDATE no action ON DELETE set null
+	FOREIGN KEY (`owner_id`) REFERENCES `members`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `accounts_puuid_unique` ON `accounts` (`puuid`);--> statement-breakpoint
@@ -81,6 +80,15 @@ CREATE TABLE `rank_snapshots` (
 );
 --> statement-breakpoint
 CREATE INDEX `snapshots_account_idx` ON `rank_snapshots` (`account_id`,`queue`,`taken_at`);--> statement-breakpoint
+CREATE TABLE `ranked_games` (
+	`account_id` integer NOT NULL,
+	`match_id` text NOT NULL,
+	`queue` text NOT NULL,
+	`ended_at` integer NOT NULL,
+	PRIMARY KEY(`account_id`, `match_id`),
+	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `sessions` (
 	`token_hash` text PRIMARY KEY NOT NULL,
 	`member_id` integer NOT NULL,

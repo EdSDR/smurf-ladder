@@ -24,7 +24,9 @@ type Match = { info: { gameEndTimestamp?: number; gameCreation: number } }
 
 async function riot<T>(host: 'platform' | 'region', path: string): Promise<T | null> {
   const base = host === 'platform' ? env.RIOT_PLATFORM : env.RIOT_REGION
-  const res = await fetch(`https://${base}.api.riotgames.com${path}`, {
+  // RIOT_API_ORIGIN points local dev at a fake Riot server; production always calls Riot.
+  const origin = env.RIOT_API_ORIGIN ? `${env.RIOT_API_ORIGIN}/${base}` : `https://${base}.api.riotgames.com`
+  const res = await fetch(`${origin}${path}`, {
     headers: { 'X-Riot-Token': env.RIOT_API_KEY },
   })
   if (res.status === 404) return null
@@ -64,9 +66,14 @@ export async function activeGameStart(puuid: string) {
   return game ? game.gameStartTime || Date.now() : null
 }
 
-export async function lastRankedMatchId(puuid: string) {
-  const ids = await riot<string[]>('region', `/lol/match/v5/matches/by-puuid/${enc(puuid)}/ids?queue=420&count=1`)
-  return ids?.[0] ?? null
+export const QUEUE_IDS = { solo: 420, flex: 440 } as const
+
+/** Ranked match IDs in one queue since `since` (ms), newest first. */
+export async function rankedMatchIds(puuid: string, queue: keyof typeof QUEUE_IDS, since: number) {
+  const startTime = Math.floor(since / 1000)
+  return (
+    (await riot<string[]>('region', `/lol/match/v5/matches/by-puuid/${enc(puuid)}/ids?queue=${QUEUE_IDS[queue]}&startTime=${startTime}&count=100`)) ?? []
+  )
 }
 
 export async function matchEndedAt(matchId: string) {

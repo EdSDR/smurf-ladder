@@ -6,3 +6,5 @@ DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 # Discord user ID of the first admin (Developer Mode → right-click yourself → Copy User ID)
 ADMIN_DISCORD_ID=
+# Optional, local only: send Riot calls to a fake server instead (see scripts/fake-riot.mjs)
+# RIOT_API_ORIGIN=http://localhost:8788

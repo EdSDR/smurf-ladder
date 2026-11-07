@@ -14,21 +14,36 @@ export type PublicAccount = {
   solo: QueueRank | null
   flex: QueueRank | null
   inGame: boolean
-  lastRankedAt: number | null
   refreshedAt: number
 }
-export type QueueRank = { tier: string; rank: string | null; lp: number; wins: number; losses: number }
+export type QueueRank = {
+  tier: string
+  rank: string | null
+  lp: number
+  wins: number
+  losses: number
+  /** Estimated decay bank in days as of refreshedAt; null below Diamond. */
+  bank: number | null
+  decayPending: boolean
+}
 
 export type MemberAccount = PublicAccount & {
   ownerId: number
   ownerName: string | null
   shared: boolean
   hasCredentials: boolean
-  claimedBy: { id: number; name: string | null } | null
 }
 
-export function queue(tier: string | null, rank: string | null, lp: number | null, wins: number | null, losses: number | null): QueueRank | null {
-  return tier ? { tier, rank, lp: lp ?? 0, wins: wins ?? 0, losses: losses ?? 0 } : null
+export function queue(
+  tier: string | null,
+  rank: string | null,
+  lp: number | null,
+  wins: number | null,
+  losses: number | null,
+  bank: number | null = null,
+  decayPending = false,
+): QueueRank | null {
+  return tier ? { tier, rank, lp: lp ?? 0, wins: wins ?? 0, losses: losses ?? 0, bank, decayPending } : null
 }
 
 export function toPublic(a: Account): PublicAccount {
@@ -38,10 +53,9 @@ export function toPublic(a: Account): PublicAccount {
     tagLine: a.tagLine,
     iconId: a.iconId,
     level: a.level,
-    solo: queue(a.soloTier, a.soloRank, a.soloLp, a.soloWins, a.soloLosses),
-    flex: queue(a.flexTier, a.flexRank, a.flexLp, a.flexWins, a.flexLosses),
+    solo: queue(a.soloTier, a.soloRank, a.soloLp, a.soloWins, a.soloLosses, a.soloBank, a.soloDecayPending),
+    flex: queue(a.flexTier, a.flexRank, a.flexLp, a.flexWins, a.flexLosses, a.flexBank, a.flexDecayPending),
     inGame: !!a.inGameSince,
-    lastRankedAt: a.lastRankedAt,
     refreshedAt: a.refreshedAt,
   }
 }
@@ -61,7 +75,6 @@ export async function memberAccounts(): Promise<MemberAccount[]> {
     ownerName: names.get(a.ownerId) ?? null,
     shared: a.shared,
     hasCredentials: withCreds.has(a.id),
-    claimedBy: a.claimedBy ? { id: a.claimedBy, name: names.get(a.claimedBy) ?? null } : null,
   }))
 }
 

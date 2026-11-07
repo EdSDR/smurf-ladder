@@ -18,8 +18,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '#/components/ui/dialog'
-import { DECAY_WARN_DAYS, decayAtRisk, winrate } from '#/lib/tiers'
-import { ago, daysSince } from '#/lib/time'
+import { winrate } from '#/lib/tiers'
+import { ago } from '#/lib/time'
+import { DecayText } from '#/components/DecayText'
 import { cn } from '#/lib/utils'
 import {
   deleteAccount,
@@ -27,7 +28,6 @@ import {
   getCredential,
   refreshNow,
   saveCredential,
-  setClaim,
   type QueueRank,
 } from '#/server/accounts.functions'
 import { useVault } from '#/vault/VaultProvider'
@@ -49,7 +49,7 @@ export const Route = createFileRoute('/accounts/$id')({
   ),
 })
 
-function QueueStat({ label, q }: { label: string; q: QueueRank | null }) {
+function QueueStat({ label, q, queue, refreshedAt }: { label: string; q: QueueRank | null; queue: 'solo' | 'flex'; refreshedAt: number }) {
   const wr = q ? winrate(q.wins, q.losses) : null
   return (
     <div className="grid gap-1 border-t py-3">
@@ -61,6 +61,7 @@ function QueueStat({ label, q }: { label: string; q: QueueRank | null }) {
             {wr}% win rate, {q.wins}W {q.losses}L
           </span>
         )}
+        {q && <DecayText q={q} queue={queue} refreshedAt={refreshedAt} detailed className="mt-1 text-sm" />}
       </dd>
     </div>
   )
@@ -75,9 +76,6 @@ function AccountDetail() {
   const riotId = `${account.gameName}#${account.tagLine}`
   const isOwner = account.ownerId === me!.id || me!.role === 'admin'
   const canSeeLogin = account.hasCredentials && (account.shared || account.ownerId === me!.id)
-  const mine = account.claimedBy?.id === me!.id
-  const days = daysSince(account.lastRankedAt)
-  const atRisk = decayAtRisk(account.solo?.tier ?? null, account.lastRankedAt)
   const q = account[queue]
 
   async function run(key: string, fn: () => Promise<unknown>, done: string) {
@@ -110,15 +108,6 @@ function AccountDetail() {
           <RankText tier={q?.tier ?? null} rank={q?.rank ?? null} lp={q?.lp} className="mt-1 text-lg" />
         </div>
         <div className="flex flex-wrap gap-2">
-          {!account.inGame && (!account.claimedBy || mine) && (
-            <Button
-              variant={mine ? 'secondary' : 'default'}
-              disabled={busy === 'claim'}
-              onClick={() => run('claim', () => setClaim({ data: { accountId: account.id, claim: !mine } }), mine ? `Released ${riotId}` : `You're on ${riotId}`)}
-            >
-              {mine ? 'Release' : "I'm on it"}
-            </Button>
-          )}
           <Button
             variant="outline"
             disabled={busy === 'refresh'}
@@ -141,11 +130,7 @@ function AccountDetail() {
       </header>
 
       <p className="mt-4 text-sm text-muted-foreground">
-        {account.inGame
-          ? 'In a game right now. '
-          : account.claimedBy
-            ? `${mine ? 'You are' : `${account.claimedBy.name ?? 'A member'} is`} on this account. `
-            : 'Free to play. '}
+        {account.inGame ? 'In a game right now. ' : ''}
         Added by {account.ownerName ?? 'a former member'}. Rank checked {ago(account.refreshedAt)}.
       </p>
 
@@ -172,15 +157,8 @@ function AccountDetail() {
           <LpChart key={queue} points={history.filter((h) => h.queue === queue)} />
 
           <dl className="mt-8 grid gap-x-8 sm:grid-cols-2">
-            <QueueStat label="Solo/Duo" q={account.solo} />
-            <QueueStat label="Flex" q={account.flex} />
-            <div className="grid gap-1 border-t py-3">
-              <dt className="text-sm text-muted-foreground">Last ranked game</dt>
-              <dd className={cn(atRisk && 'font-semibold')}>
-                {days === null ? 'None found' : days === 0 ? 'Today' : `${days} ${days === 1 ? 'day' : 'days'} ago`}
-                {atRisk && <span className="block text-sm font-normal text-muted-foreground">Diamond and up can decay. Flagged after {DECAY_WARN_DAYS} days without ranked.</span>}
-              </dd>
-            </div>
+            <QueueStat label="Solo/Duo" q={account.solo} queue="solo" refreshedAt={account.refreshedAt} />
+            <QueueStat label="Flex" q={account.flex} queue="flex" refreshedAt={account.refreshedAt} />
             <div className="grid gap-1 border-t py-3">
               <dt className="text-sm text-muted-foreground">Summoner level</dt>
               <dd className="nums">{account.level ?? 'Unknown'}</dd>

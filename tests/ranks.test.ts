@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decayAtRisk, formatRank, rankScore, winrate } from '#/lib/tiers'
+import { formatRank, rankScore, winrate } from '#/lib/tiers'
 import { rankChanged } from '#/server/snapshots'
 
 describe('rank math', () => {
@@ -19,14 +19,6 @@ describe('rank math', () => {
   it('computes win rate', () => {
     expect(winrate(58, 42)).toBe(58)
     expect(winrate(0, 0)).toBeNull()
-  })
-
-  it('flags decay only for Diamond and up after 21 idle days', () => {
-    const now = Date.UTC(2026, 10, 7)
-    const day = 86_400_000
-    expect(decayAtRisk('DIAMOND', now - 22 * day, now)).toBe(true)
-    expect(decayAtRisk('DIAMOND', now - 5 * day, now)).toBe(false)
-    expect(decayAtRisk('EMERALD', now - 60 * day, now)).toBe(false)
   })
 })
 

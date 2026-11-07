@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "55ea13f2-9436-4263-ac56-a569afd4ddc6",
+  "id": "699bf2a9-e855-40ed-b0af-b5c279318a19",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "accounts": {
@@ -134,36 +134,38 @@
           "notNull": false,
           "autoincrement": false
         },
-        "last_ranked_match_id": {
-          "name": "last_ranked_match_id",
-          "type": "text",
+        "solo_bank": {
+          "name": "solo_bank",
+          "type": "real",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "last_ranked_at": {
-          "name": "last_ranked_at",
-          "type": "integer",
+        "flex_bank": {
+          "name": "flex_bank",
+          "type": "real",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "solo_decay_pending": {
+          "name": "solo_decay_pending",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "flex_decay_pending": {
+          "name": "flex_decay_pending",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "in_game_since": {
           "name": "in_game_since",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "claimed_by": {
-          "name": "claimed_by",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "claimed_at": {
-          "name": "claimed_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -222,19 +224,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "accounts_claimed_by_members_id_fk": {
-          "name": "accounts_claimed_by_members_id_fk",
-          "tableFrom": "accounts",
-          "tableTo": "members",
-          "columnsFrom": [
-            "claimed_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -576,6 +565,66 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "ranked_games": {
+      "name": "ranked_games",
+      "columns": {
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "match_id": {
+          "name": "match_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "queue": {
+          "name": "queue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ended_at": {
+          "name": "ended_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ranked_games_account_id_accounts_id_fk": {
+          "name": "ranked_games_account_id_accounts_id_fk",
+          "tableFrom": "ranked_games",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ranked_games_account_id_match_id_pk": {
+          "columns": [
+            "account_id",
+            "match_id"
+          ],
+          "name": "ranked_games_account_id_match_id_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },

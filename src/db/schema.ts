@@ -3,6 +3,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core'
@@ -83,13 +84,13 @@ export const accounts = sqliteTable(
     flexWins: integer('flex_wins'),
     flexLosses: integer('flex_losses'),
 
-    lastRankedMatchId: text('last_ranked_match_id'),
-    lastRankedAt: integer('last_ranked_at'),
+    // Estimated decay bank in days, as of refreshedAt. Null below Diamond.
+    soloBank: real('solo_bank'),
+    flexBank: real('flex_bank'),
+    // True while older ranked games are still being fetched, so the bank isn't trustworthy yet.
+    soloDecayPending: integer('solo_decay_pending', { mode: 'boolean' }).notNull().default(false),
+    flexDecayPending: integer('flex_decay_pending', { mode: 'boolean' }).notNull().default(false),
     inGameSince: integer('in_game_since'),
-    claimedBy: integer('claimed_by').references(() => members.id, {
-      onDelete: 'set null',
-    }),
-    claimedAt: integer('claimed_at'),
     refreshedAt: integer('refreshed_at').notNull().default(0),
     riotIdCheckedAt: integer('riot_id_checked_at').notNull().default(0),
     createdAt: integer('created_at').notNull().default(now),
@@ -127,6 +128,20 @@ export const rankSnapshots = sqliteTable(
     takenAt: integer('taken_at').notNull(),
   },
   (t) => [index('snapshots_account_idx').on(t.accountId, t.queue, t.takenAt)],
+)
+
+/** End times of recent ranked games, cached so each match is fetched from Riot only once. */
+export const rankedGames = sqliteTable(
+  'ranked_games',
+  {
+    accountId: integer('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    matchId: text('match_id').notNull(),
+    queue: text('queue', { enum: ['solo', 'flex'] }).notNull(),
+    endedAt: integer('ended_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.matchId] })],
 )
 
 export type Member = typeof members.$inferSelect

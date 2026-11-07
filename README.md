@@ -5,19 +5,30 @@ Every League of Legends account your group shares, on one ladder. Pick a tier an
 ![The ladder: accounts pinned on their tier, with the list below](docs/ladder.png)
 
 - **The ladder.** Every account is pinned on its tier, from Iron to Challenger, for Solo/Duo or Flex. Click a tier to filter.
-- **Live status.** Ranks, win rates and "in game now" refresh automatically every few minutes. Members can mark an account "I'm on it" so nobody else logs in at the same time.
+- **Live status.** Ranks, win rates and "in game now" refresh automatically every few minutes.
+- **Decay countdown.** Diamond+ accounts show how many days are left before they start losing LP, separately for Solo/Duo and Flex. A filter lists everything that decays within 3 days.
 - **Rank history.** Each account keeps a chart of its LP over time.
-- **Decay warning.** Diamond+ accounts that haven't played ranked in 21 days get flagged.
 - **End-to-end encrypted logins.** Each account can store its login. You choose whether it's shared with every member or private to you. Logins are encrypted in the browser, and the server only ever holds ciphertext.
-- **Members only.** Members sign in with Discord and must be on an allowlist. Anyone can see the public ladder (Riot ID and rank). Owners, claims and logins are visible to members only.
+- **Members only.** Members sign in with Discord and must be on an allowlist. Anyone can see the public ladder (Riot ID and rank). Owners and logins are visible to members only.
 
 It runs entirely on Cloudflare's free plan (Workers, D1, Cron Triggers) and the free Riot API.
 
-![An account's page: rank history and its decrypted login](docs/account.png)
+![An account’s page: rank history and decay countdown for each queue](docs/account.png)
 
 ## Stack
 
 [TanStack Start](https://tanstack.com/start) (React, SSR, server functions) · Tailwind CSS v4 + shadcn/ui · Cloudflare Workers via `@cloudflare/vite-plugin` · D1 + Drizzle ORM · Discord OAuth via [arctic](https://arcticjs.dev) · WebCrypto for the vault.
+
+## How the decay countdown works
+
+Riot's API doesn't expose the decay bank, so the app rebuilds it from published rules ([Riot support](https://support.riotgames.com/en-us/league-of-legends/gameplay/placements-promotions-series-demotions-and-decay)):
+
+| Tier | Days per game | Max banked | LP lost per day at zero |
+|---|---|---|---|
+| Diamond | 7 | 28 | 50 |
+| Master, Grandmaster, Challenger | 1 | 14 | 75 |
+
+For each Diamond+ queue, the refresh job lists that queue's ranked games from the last 28 days, caches each game's end time (each match is fetched once), and replays them: games add days up to the cap, and one day drains per day. A promotion it has seen into Diamond or Master starts a full bank. The result is an estimate. Riot runs the daily decay at a fixed time we can't see, so it can be off by a day. The in-client profile shows the exact number.
 
 ## How the vault works
 
@@ -70,9 +81,11 @@ pnpm test                         # vault crypto + rank logic
 
 To run the refresh job locally: `curl -X POST "http://localhost:5173/cdn-cgi/local/explorer/api/local/scheduled?worker=smurf-ladder" -d '{"cron":"*/5 * * * *"}'`.
 
+To exercise the refresh job without a Riot key, run `node scripts/fake-riot.mjs` and set `RIOT_API_ORIGIN=http://localhost:8788` in `.dev.vars`.
+
 ### Free-tier budget
 
-The cron runs every 5 minutes and refreshes the 9 stalest accounts. That's 3–5 Riot calls each, which stays under the free plan's 50 outbound requests per run and Riot's 100 requests per 2 minutes. At that rate, 50 accounts cycle in about 25 minutes. Rank snapshots are written only when something changed.
+The cron runs every 5 minutes with a budget of 48 Riot calls, under the free plan's 50 outbound requests per run and Riot's 100 requests per 2 minutes. Each account costs 2 calls, plus 1 per Diamond+ queue for its match list, plus 1 per ranked game it hasn't seen before. The stalest accounts go first until the budget runs out, so a group of ~50 accounts cycles in well under an hour. A new Master account with a long backlog shows "Checking decay…" until its games are cached. Rank snapshots are written only when something changed.
 
 ## Legal
 

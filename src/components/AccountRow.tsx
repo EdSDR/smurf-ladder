@@ -1,13 +1,11 @@
-import { Link, useRouter } from '@tanstack/react-router'
-import { ChevronRightIcon, TriangleAlertIcon } from 'lucide-react'
-import { toast } from 'sonner'
+import { Link } from '@tanstack/react-router'
+import { ChevronRightIcon } from 'lucide-react'
 import { Button } from '#/components/ui/button'
 import type { MemberAccount, PublicAccount } from '#/server/accounts.functions'
-import { setClaim } from '#/server/accounts.functions'
-import { DECAY_WARN_DAYS, TIER_META, decayAtRisk, formatRank, isTier, winrate } from '#/lib/tiers'
-import { daysSince } from '#/lib/time'
+import { TIER_META, formatRank, isTier, winrate } from '#/lib/tiers'
 import { cn } from '#/lib/utils'
 import { CredentialDialog } from './CredentialDialog'
+import { DecayText } from './DecayText'
 import type { Queue } from './Ladder'
 import { ProfileIcon, TierMark } from './TierMark'
 
@@ -44,52 +42,25 @@ function Winrate({ wins, losses }: { wins: number; losses: number }) {
   )
 }
 
-function Status({ account, meId }: { account: Row; meId?: number }) {
-  if (account.inGame) {
-    return (
-      <span className="flex items-center gap-1.5 text-sm font-medium">
-        <span className="size-2 rounded-full" style={{ background: 'var(--tier-emerald)' }} aria-hidden />
-        In game
-      </span>
-    )
-  }
-  if (account.claimedBy) {
-    return (
-      <span className="text-sm text-muted-foreground">
-        {account.claimedBy.id === meId ? "You're on it" : `${account.claimedBy.name ?? 'A member'} is on it`}
-      </span>
-    )
-  }
-  return <span className="text-sm text-muted-foreground">Free</span>
-}
-
-function LastRanked({ account, queue }: { account: Row; queue: Queue }) {
-  const days = daysSince(account.lastRankedAt)
-  const atRisk = decayAtRisk(account[queue]?.tier ?? null, account.lastRankedAt)
-  if (days === null) return <span className="text-xs text-muted-foreground">No ranked games found</span>
+function InGame() {
   return (
-    <span
-      className={cn('flex items-center gap-1 text-xs', atRisk ? 'text-foreground' : 'text-muted-foreground')}
-      title={atRisk ? `Diamond and above decay after inactivity. Flagged at ${DECAY_WARN_DAYS}+ days.` : undefined}
-    >
-      {atRisk && <TriangleAlertIcon className="size-3.5" style={{ color: 'var(--tier-gold)' }} aria-label="Decay risk" />}
-      {days === 0 ? 'Ranked today' : `${days} ${days === 1 ? 'day' : 'days'} since ranked`}
+    <span className="flex items-center gap-1.5 text-sm font-medium">
+      <span className="size-2 rounded-full" style={{ background: 'var(--tier-emerald)' }} aria-hidden />
+      In game
     </span>
   )
 }
 
 export function AccountRow({ account, queue, meId }: { account: Row; queue: Queue; meId?: number }) {
-  const router = useRouter()
   const q = account[queue]
   const isMember = meId !== undefined
   const riotId = `${account.gameName}#${account.tagLine}`
   const canSeeLogin = isMember && account.hasCredentials && (account.shared || account.ownerId === meId)
-  const mine = account.claimedBy?.id === meId
 
   return (
     <li
       id={`account-${account.id}`}
-      style={{ '--actions-w': isMember ? '11rem' : '0px' } as React.CSSProperties}
+      style={{ '--actions-w': isMember ? '7rem' : '0px' } as React.CSSProperties}
       className="grid scroll-mt-24 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b px-1 py-3 target:bg-panel md:grid-cols-[auto_minmax(0,1.6fr)_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_var(--actions-w)] md:gap-x-5"
     >
       <ProfileIcon iconId={account.iconId} />
@@ -112,29 +83,11 @@ export function AccountRow({ account, queue, meId }: { account: Row; queue: Queu
       <div className="hidden md:block">{q ? <Winrate wins={q.wins} losses={q.losses} /> : <span className="text-sm text-muted-foreground">Not placed</span>}</div>
 
       <div className="col-span-2 col-start-2 row-start-3 flex flex-wrap items-center gap-x-4 gap-y-1 md:col-span-1 md:col-start-auto md:row-start-auto md:grid md:gap-1">
-        <Status account={account} meId={meId} />
-        <LastRanked account={account} queue={queue} />
+        {account.inGame && <InGame />}
+        <DecayText q={q} queue={queue} refreshedAt={account.refreshedAt} />
       </div>
 
       <div className="col-start-3 row-span-2 row-start-1 flex items-center justify-end gap-1.5 md:col-start-auto md:row-span-1 md:row-start-auto">
-        {isMember && !account.inGame && (!account.claimedBy || mine) && (
-          <Button
-            variant={mine ? 'secondary' : 'ghost'}
-            size="sm"
-            className="hidden sm:inline-flex"
-            onClick={async () => {
-              try {
-                await setClaim({ data: { accountId: account.id, claim: !mine } })
-                toast.success(mine ? `Released ${riotId}` : `You're on ${riotId}`)
-                router.invalidate()
-              } catch (e) {
-                toast.error((e as Error).message)
-              }
-            }}
-          >
-            {mine ? 'Release' : "I'm on it"}
-          </Button>
-        )}
         {canSeeLogin && <CredentialDialog accountId={account.id} riotId={riotId} />}
         {isMember && (
           <Button variant="ghost" size="icon-sm" asChild>

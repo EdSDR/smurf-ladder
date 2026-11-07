@@ -55,10 +55,3 @@ export function winrate(wins: number | null, losses: number | null): number | nu
   const games = (wins ?? 0) + (losses ?? 0)
   return games ? Math.round(((wins ?? 0) / games) * 100) : null
 }
-
-/** Diamond and up decay after inactivity; Riot doesn't expose the bank, so we flag by days idle. */
-export const DECAY_WARN_DAYS = 21
-export function decayAtRisk(tier: string | null, lastRankedAt: number | null, now = Date.now()): boolean {
-  if (tierIndex(tier) < TIERS.indexOf('DIAMOND') || !lastRankedAt) return false
-  return now - lastRankedAt >= DECAY_WARN_DAYS * 86_400_000
-}
