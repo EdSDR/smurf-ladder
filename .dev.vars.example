@@ -1,0 +1,8 @@
+# Copy to .dev.vars for local dev. In production use `wrangler secret put <NAME>`.
+# Riot personal API key from https://developer.riotgames.com
+RIOT_API_KEY=RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+# Discord application (OAuth2) — redirect URI: <origin>/auth/discord/callback
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+# Discord user ID of the first admin (Developer Mode → right-click yourself → Copy User ID)
+ADMIN_DISCORD_ID=

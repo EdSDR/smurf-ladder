@@ -1,0 +1,60 @@
+{
+  "name": "smurf-ladder",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "preview": "pnpm run build && vite preview",
+    "deploy": "pnpm run build && wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply smurf-ladder --local",
+    "db:migrate:remote": "wrangler d1 migrations apply smurf-ladder --remote"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-router": "1.170.46",
+    "@tanstack/react-start": "1.169.4",
+    "arctic": "^3.7.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cn": "^0.5.2",
+    "drizzle-orm": "^0.45.4",
+    "lucide-react": "^1.70.0",
+    "radix-ui": "^1.8.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.1.18",
+    "tw-animate-css": "^1.4.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.26.0",
+    "@tanstack/router-cli": "^1.132.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "drizzle-kit": "^0.31.11",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.158.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lightningcss",
+      "sharp",
+      "workerd"
+    ]
+  }
+}
