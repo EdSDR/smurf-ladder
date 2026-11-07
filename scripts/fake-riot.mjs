@@ -33,6 +33,11 @@ const routes = [
 
 createServer((req, res) => {
   calls++
+  // Like Riot after an API key change: PUUIDs from another key fail to decrypt.
+  if (/by-puuid\/(?!fake-puuid)[^/?]+/.test(req.url)) {
+    res.writeHead(400, { 'content-type': 'application/json' })
+    return res.end(JSON.stringify({ status: { message: 'Bad Request - Exception decrypting', status_code: 400 } }))
+  }
   for (const [re, handler] of routes) {
     const m = req.url.match(re)
     if (!m) continue

@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import type { Account } from '#/db/schema'
 import { DECAY_WINDOW_DAYS, decayRules, estimateBank } from '#/lib/decay'
+import { UserError } from '#/lib/errors'
 import * as riot from './riot'
 import { queueState, rankChanged } from './snapshots'
 
@@ -84,12 +85,40 @@ async function updateDecay(account: Account, queue: Queue, tier: string | null, 
   return { bank, pending }
 }
 
-export async function refreshAccount(account: Account, budget = new Budget(CRON_BUDGET)): Promise<void> {
+/**
+ * Riot encrypts PUUIDs per API key, so a stored PUUID stops working whenever the key changes
+ * (daily with a development key). Look the account up again by its Riot ID and keep going.
+ */
+async function reresolvePuuid(account: Account, budget: Budget): Promise<Account> {
+  budget.take()
+  const fresh = await riot.accountByRiotId(account.gameName, account.tagLine)
+  if (!fresh) {
+    throw new UserError(`Riot can't find ${account.gameName}#${account.tagLine} anymore. If it was renamed, remove it and add it again.`)
+  }
+  await getDb()
+    .update(accounts)
+    .set({ puuid: fresh.puuid, gameName: fresh.gameName, tagLine: fresh.tagLine, riotIdCheckedAt: Date.now() })
+    .where(eq(accounts.id, account.id))
+  return { ...account, puuid: fresh.puuid, gameName: fresh.gameName, tagLine: fresh.tagLine }
+}
+
+async function leagueEntriesHealing(account: Account, budget: Budget) {
+  try {
+    return { account, entries: await riot.leagueEntries(account.puuid) }
+  } catch (err) {
+    if (!(err instanceof riot.RiotError) || err.status !== 400) throw err
+    const healed = await reresolvePuuid(account, budget)
+    return { account: healed, entries: await riot.leagueEntries(healed.puuid) }
+  }
+}
+
+export async function refreshAccount(stored: Account, budget = new Budget(CRON_BUDGET)): Promise<void> {
   const db = getDb()
   const now = Date.now()
   budget.take(2)
 
-  const [entries, gameStart] = await Promise.all([riot.leagueEntries(account.puuid), riot.activeGameStart(account.puuid)])
+  const { account, entries } = await leagueEntriesHealing(stored, budget)
+  const gameStart = await riot.activeGameStart(account.puuid)
   const solo = riot.pickQueue(entries, 'RANKED_SOLO_5x5')
   const flex = riot.pickQueue(entries, 'RANKED_FLEX_SR')
 
