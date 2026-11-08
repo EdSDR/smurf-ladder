@@ -1,9 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
-import { desc, eq, inArray } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { getDb, schema } from '#/db'
 import { UserError } from '#/lib/errors'
 import { mergeChampStats, summarize, type GameRow } from '#/lib/matchStats'
+import { SEASON_START } from '#/lib/season'
 import { rankScore } from '#/lib/tiers'
 import { input } from '#/lib/validate'
 import { memberAccounts } from './accounts.server'
@@ -126,4 +127,69 @@ export const updateProfile = createServerFn({ method: 'POST' })
       .update(schema.members)
       .set({ bannerChampionId: data.bannerChampionId, tagline: data.tagline || null })
       .where(eq(schema.members.id, context.member.id))
+  })
+
+const RANGES = { week: 7, month: 30, season: 365 } as const
+const bestCache = new Map<string, { at: number; rows: BestGame[] }>()
+
+export type BestGame = {
+  matchId: string
+  accountId: number
+  gameName: string
+  tagLine: string
+  ownerId: number
+  ownerName: string | null
+  endedAt: number
+  queue: 'solo' | 'flex'
+  win: boolean
+  championId: number
+  kills: number
+  deaths: number
+  assists: number
+  cs: number
+  durationS: number
+  score: number
+  badge: 'MVP' | 'ACE' | null
+  placement: number | null
+}
+
+/** The group's highest-scoring games in a period, cached for five minutes. */
+export const getBestGames = createServerFn({ method: 'GET' })
+  .middleware([memberMiddleware])
+  .validator(input(z.object({ range: z.enum(['week', 'month', 'season']) })))
+  .handler(async ({ data }) => {
+    const hit = bestCache.get(data.range)
+    if (hit && Date.now() - hit.at < 5 * 60_000) return hit.rows
+    const db = getDb()
+    const since = Math.max(Date.now() - RANGES[data.range] * 86_400_000, data.range === 'season' ? SEASON_START : 0)
+    const rows = await db
+      .select({ p: schema.matchPlayers, a: { gameName: schema.accounts.gameName, tagLine: schema.accounts.tagLine, ownerId: schema.accounts.ownerId }, ownerName: schema.members.name })
+      .from(schema.matchPlayers)
+      .innerJoin(schema.accounts, eq(schema.accounts.id, schema.matchPlayers.accountId))
+      .leftJoin(schema.members, eq(schema.members.id, schema.accounts.ownerId))
+      .where(and(gte(schema.matchPlayers.endedAt, since), isNotNull(schema.matchPlayers.score), eq(schema.matchPlayers.remake, false)))
+      .orderBy(desc(schema.matchPlayers.score), desc(schema.matchPlayers.kills))
+      .limit(25)
+    const out: BestGame[] = rows.map(({ p, a, ownerName }) => ({
+      matchId: p.matchId,
+      accountId: p.accountId,
+      gameName: a.gameName,
+      tagLine: a.tagLine,
+      ownerId: a.ownerId,
+      ownerName,
+      endedAt: p.endedAt,
+      queue: p.queue,
+      win: p.win,
+      championId: p.championId,
+      kills: p.kills,
+      deaths: p.deaths,
+      assists: p.assists,
+      cs: p.cs,
+      durationS: p.durationS,
+      score: p.score!,
+      badge: p.badge,
+      placement: p.placement,
+    }))
+    bestCache.set(data.range, { at: Date.now(), rows: out })
+    return out
   })

@@ -7,7 +7,7 @@ import { kda, type ChampStat, type Summary } from '#/lib/matchStats'
 import { placementLabel } from '#/lib/score'
 import { TIERS, TIER_META, formatRank, rankScore } from '#/lib/tiers'
 
-export type ChartGame = { matchId: string; win: boolean; championId: number; score: number | null; placement: number | null; badge: 'MVP' | 'ACE' | null; endedAt: number }
+export type ChartGame = { matchId: string; accountId?: number; win: boolean; championId: number; score: number | null; placement: number | null; badge: 'MVP' | 'ACE' | null; endedAt: number }
 
 function Stat({ value, label, accent }: { value: React.ReactNode; label: string; accent?: string }) {
   return (
@@ -38,17 +38,18 @@ function useNarrow() {
 function ScoreChart({ games }: { games: ChartGame[] }) {
   // Phones get the last 10 games so champion icons stay legible.
   const narrow = useNarrow()
-  const data = [...games.slice(0, narrow ? 10 : 20)].reverse().map((g, i) => ({ ...g, i, value: g.score ?? 0 }))
+  // A game can appear twice when two tracked accounts played it, so keys use the position.
+  const data = [...games.slice(0, narrow ? 10 : 20)].reverse().map((g, i) => ({ ...g, i, key: `${g.matchId}-${g.accountId ?? 0}-${i}`, value: g.score ?? 0 }))
   const Tick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value: number } }) => {
     const g = data[payload?.value ?? 0]
     if (!g || x === undefined || y === undefined) return null
     const color = g.badge === 'MVP' ? 'var(--mvp)' : g.badge === 'ACE' ? 'var(--ace)' : 'var(--muted-ink)'
     return (
       <g transform={`translate(${x},${y})`}>
-        <clipPath id={`clip-${g.matchId}`}>
+        <clipPath id={`clip-${g.key}`}>
           <circle cx={0} cy={13} r={10} />
         </clipPath>
-        <image href={champIconUrl(g.championId)} x={-10} y={3} width={20} height={20} clipPath={`url(#clip-${g.matchId})`} />
+        <image href={champIconUrl(g.championId)} x={-10} y={3} width={20} height={20} clipPath={`url(#clip-${g.key})`} />
         <circle cx={0} cy={13} r={10.5} fill="none" stroke={g.win ? 'var(--win)' : 'var(--loss)'} strokeWidth={1.5} />
         <text x={0} y={38} textAnchor="middle" fontSize={10} fontWeight={700} fill={color}>
           {g.placement ? placementLabel(g.placement, g.badge) : 'Rmk'}
@@ -80,7 +81,7 @@ function ScoreChart({ games }: { games: ChartGame[] }) {
         <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={22}>
           <LabelList dataKey="value" position="top" fontSize={10} fill="var(--bone)" formatter={(v: unknown) => (typeof v === 'number' && v ? v.toFixed(1) : '')} />
           {data.map((g) => (
-            <Cell key={g.matchId} fill={g.win ? 'var(--win)' : 'var(--loss)'} fillOpacity={g.score === null ? 0.25 : 0.85} />
+            <Cell key={g.key} fill={g.win ? 'var(--win)' : 'var(--loss)'} fillOpacity={g.score === null ? 0.25 : 0.85} />
           ))}
         </Bar>
       </BarChart>
