@@ -128,7 +128,7 @@ export function SiteHeader({ me }: { me: Me | null }) {
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4">
         <Wordmark />
         <nav className="ml-4 hidden items-stretch md:flex" aria-label="Main">
-          {NAV.filter((n) => me || n.to === '/').map((n) => (
+          {NAV.filter((n) => me || n.to !== '/members').map((n) => (
             <Link key={n.to} to={n.to} className={navLink} activeProps={navActive} activeOptions={{ exact: n.exact, includeSearch: false }}>
               {n.label}
             </Link>

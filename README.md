@@ -15,7 +15,7 @@ Also:
 - **Game score.** Our own 0–10 rating per game, comparing each player with the other nine (KDA, kill share, damage, gold, CS, vision). The **Best games** board ranks the group's top scores by week, month or season.
 - **Decay countdown.** Diamond+ accounts show the days left before they lose LP, per queue.
 - **End-to-end encrypted logins.** Each account can store its login, shared with every member or private to you. Logins are encrypted in the browser, and the server only ever holds ciphertext.
-- **Members only.** Members sign in with Discord and must be on an allowlist. The public sees only the leaderboard (Riot ID and rank); everything else needs signing in.
+- **What's public.** Anyone can see the leaderboard, account pages and the Best games board, but never who added an account, whether its login is shared, or the login itself (the server strips those before responding). Member pages, search, logins and editing need a Discord sign-in from a member on the allowlist.
 
 It runs entirely on Cloudflare's free plan (Workers, D1, Cron Triggers) and the free Riot API.
 

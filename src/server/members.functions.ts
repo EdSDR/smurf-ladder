@@ -9,6 +9,7 @@ import { rankScore } from '#/lib/tiers'
 import { input } from '#/lib/validate'
 import { memberAccounts } from './accounts.server'
 import { memberMiddleware } from './middleware'
+import { getSessionMember } from './session'
 
 /** Everything the ⌘K search can jump to. Members only: it links accounts to their owners. */
 export const searchIndex = createServerFn({ method: 'GET' })
@@ -153,13 +154,16 @@ export type BestGame = {
   placement: number | null
 }
 
-/** The group's highest-scoring games in a period, cached for five minutes. */
+/** Visitors see the games but not who owns each account. */
+const withoutOwners = (rows: BestGame[]): BestGame[] => rows.map((r) => ({ ...r, ownerId: 0, ownerName: null }))
+
+/** The group's highest-scoring games in a period, cached for five minutes. Public, minus owners. */
 export const getBestGames = createServerFn({ method: 'GET' })
-  .middleware([memberMiddleware])
   .validator(input(z.object({ range: z.enum(['week', 'month', 'season']) })))
   .handler(async ({ data }) => {
+    const member = await getSessionMember()
     const hit = bestCache.get(data.range)
-    if (hit && Date.now() - hit.at < 5 * 60_000) return hit.rows
+    if (hit && Date.now() - hit.at < 5 * 60_000) return member ? hit.rows : withoutOwners(hit.rows)
     const db = getDb()
     const since = Math.max(Date.now() - RANGES[data.range] * 86_400_000, data.range === 'season' ? SEASON_START : 0)
     const rows = await db
@@ -191,5 +195,5 @@ export const getBestGames = createServerFn({ method: 'GET' })
       placement: p.placement,
     }))
     bestCache.set(data.range, { at: Date.now(), rows: out })
-    return out
+    return member ? out : withoutOwners(out)
   })

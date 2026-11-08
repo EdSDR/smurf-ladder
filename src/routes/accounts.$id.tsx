@@ -1,4 +1,4 @@
-import { Link, createFileRoute, redirect, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
 import { CopyIcon, KeyRoundIcon, RefreshCwIcon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -24,14 +24,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { ago } from '#/lib/time'
 import { cn } from '#/lib/utils'
 import { deleteAccount, getAccountDetail, getCredential, getMatchPage, refreshNow, saveCredential } from '#/server/accounts.functions'
-import type { MatchEntry } from '#/server/accounts.server'
+import type { MatchEntry, MemberAccount } from '#/server/accounts.server'
 import { useVault } from '#/vault/VaultProvider'
 import { LoginFields, ShareSwitch } from '#/components/LoginFields'
 
+// Public: visitors get the account without its owner, sharing or login (stripped on the server).
 export const Route = createFileRoute('/accounts/$id')({
-  beforeLoad: ({ context }) => {
-    if (!context.me) throw redirect({ to: '/' })
-  },
   loader: ({ params }) => getAccountDetail({ data: { accountId: Number(params.id) } }),
   head: ({ loaderData }) => ({ meta: [{ title: loaderData ? `${loaderData.account.gameName}#${loaderData.account.tagLine} – Smurf Ladder` : 'Smurf Ladder' }] }),
   component: AccountDetail,
@@ -91,8 +89,10 @@ function AccountDetail() {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const riotId = `${account.gameName}#${account.tagLine}`
-  const isOwner = account.ownerId === me!.id || me!.role === 'admin'
-  const canSeeLogin = account.hasCredentials && (account.shared || account.ownerId === me!.id)
+  // Owner, sharing and login only exist in the members' version of the data.
+  const owned = data.viewer === 'member' && me ? (data.account as MemberAccount) : null
+  const isOwner = !!owned && (owned.ownerId === me!.id || me!.role === 'admin')
+  const canSeeLogin = !!owned && owned.hasCredentials && (owned.shared || owned.ownerId === me!.id)
   const bannerChamp = data.champStats[0]?.champion ?? liveGame?.championId ?? null
   const chartGames = matches.filter((m) => !m.remake).slice(0, 20)
 
@@ -123,7 +123,7 @@ function AccountDetail() {
             <div className="min-w-0">
               <div className="mb-1 flex flex-wrap items-center gap-1.5 text-xs">
                 {data.place && <span className="rounded-md bg-bone px-1.5 py-0.5 font-bold text-rift">#{data.place} in the group</span>}
-                <span className="rounded-md border bg-rift/70 px-1.5 py-0.5">{account.shared ? 'Shared login' : 'Private login'}</span>
+                {owned && <span className="rounded-md border bg-rift/70 px-1.5 py-0.5">{owned.shared ? 'Shared login' : 'Private login'}</span>}
                 {account.inGame && <span className="rounded-md bg-loss px-1.5 py-0.5 font-bold text-white">Live</span>}
               </div>
               <h1 className="wide text-2xl leading-tight font-extrabold tracking-tight break-words sm:text-[2.5rem]">
@@ -132,20 +132,24 @@ function AccountDetail() {
               </h1>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                 <RankLabel tier={account.solo?.tier ?? null} rank={account.solo?.rank ?? null} lp={account.solo?.lp} />
-                <span className="text-muted-foreground">
-                  Added by{' '}
-                  <Link to="/members/$id" params={{ id: String(account.ownerId) }} className="text-foreground underline-offset-4 hover:underline">
-                    {account.ownerName ?? 'a former member'}
-                  </Link>
-                </span>
+                {owned && (
+                  <span className="text-muted-foreground">
+                    Added by{' '}
+                    <Link to="/members/$id" params={{ id: String(owned.ownerId) }} className="text-foreground underline-offset-4 hover:underline">
+                      {owned.ownerName ?? 'a former member'}
+                    </Link>
+                  </span>
+                )}
               </div>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="bg-rift/70" onClick={refresh} disabled={busy}>
-              <RefreshCwIcon className={cn(busy && 'animate-spin motion-reduce:animate-none')} />
-              Refresh
-            </Button>
+            {owned && (
+              <Button variant="outline" className="bg-rift/70" onClick={refresh} disabled={busy}>
+                <RefreshCwIcon className={cn(busy && 'animate-spin motion-reduce:animate-none')} />
+                Refresh
+              </Button>
+            )}
             <Button
               variant="outline"
               className="bg-rift/70"
@@ -221,17 +225,17 @@ function AccountDetail() {
           </Panel>
         </TabsContent>
 
-        {(canSeeLogin || isOwner) && (
+        {owned && (canSeeLogin || isOwner) && (
           <TabsContent value="login">
             <div className="grid max-w-2xl gap-6">
-              <Panel title="Login" action={<span className="text-xs text-muted-foreground">{account.shared ? 'Shared with all members' : account.ownerId === me!.id ? 'Private to you' : `Private to ${account.ownerName ?? 'its owner'}`}</span>}>
+              <Panel title="Login" action={<span className="text-xs text-muted-foreground">{owned.shared ? 'Shared with all members' : owned.ownerId === me!.id ? 'Private to you' : `Private to ${owned.ownerName ?? 'its owner'}`}</span>}>
                 {canSeeLogin ? (
                   <CredentialView accountId={account.id} />
                 ) : (
-                  <p className="text-sm text-muted-foreground">{account.hasCredentials ? 'Only the member who added it can see this login.' : 'No login saved yet.'}</p>
+                  <p className="text-sm text-muted-foreground">{owned.hasCredentials ? 'Only the member who added it can see this login.' : 'No login saved yet.'}</p>
                 )}
               </Panel>
-              {isOwner && <EditLogin accountId={account.id} shared={account.shared} hasCredentials={account.hasCredentials} />}
+              {isOwner && <EditLogin accountId={account.id} shared={owned.shared} hasCredentials={owned.hasCredentials} />}
               {isOwner && <RemoveAccount accountId={account.id} riotId={riotId} />}
               <p className="text-xs text-muted-foreground">Rank checked {ago(account.refreshedAt)}.</p>
             </div>

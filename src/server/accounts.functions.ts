@@ -1,15 +1,16 @@
 import { createServerFn } from '@tanstack/react-start'
-import { desc, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { UserError } from '#/lib/errors'
 import { input } from '#/lib/validate'
 import { getDb, schema } from '#/db'
-import { rankScore } from '#/lib/tiers'
 import {
   REFRESH_COOLDOWN_MS,
   assertOwner,
   assertSealedCorrectly,
+  loadAccountDetail,
   matchPage,
+  publicDetailCache,
   memberAccounts,
   publicAccounts,
   queue,
@@ -98,52 +99,24 @@ export const addAccount = createServerFn({ method: 'POST' })
 
 const accountIdInput = z.object({ accountId: z.number().int() })
 
+/**
+ * Members get the full account; visitors get it without the owner, sharing or login flags
+ * (removed here, so they never reach the browser), cached for a minute per account.
+ */
 export const getAccountDetail = createServerFn({ method: 'GET' })
-  .middleware([memberMiddleware])
   .validator(input(accountIdInput))
   .handler(async ({ data }) => {
-    const db = getDb()
-    const all = await memberAccounts()
-    const account = all.find((a) => a.id === data.accountId)
-    if (!account) throw new UserError('That account no longer exists.')
-    const [history, [stats], [row], page] = await Promise.all([
-      db
-        .select({
-          queue: schema.rankSnapshots.queue,
-          tier: schema.rankSnapshots.tier,
-          rank: schema.rankSnapshots.rank,
-          lp: schema.rankSnapshots.lp,
-          wins: schema.rankSnapshots.wins,
-          losses: schema.rankSnapshots.losses,
-          takenAt: schema.rankSnapshots.takenAt,
-        })
-        .from(schema.rankSnapshots)
-        .where(eq(schema.rankSnapshots.accountId, data.accountId))
-        .orderBy(desc(schema.rankSnapshots.takenAt))
-        .limit(300),
-      db.select().from(schema.accountStats).where(eq(schema.accountStats.accountId, data.accountId)),
-      db.select({ liveGame: schema.accounts.liveGame }).from(schema.accounts).where(eq(schema.accounts.id, data.accountId)),
-      matchPage(data.accountId, null),
-    ])
-    const solo = (a: (typeof all)[number]) => rankScore(a.solo?.tier ?? null, a.solo?.rank ?? null, a.solo?.lp ?? null)
-    const place = account.solo ? all.filter((a) => solo(a) > solo(account)).length + 1 : null
-    // Tracked accounts by Riot ID, so lobby lists can link to them.
-    const tracked = Object.fromEntries(all.map((a) => [`${a.gameName}#${a.tagLine}`.toLowerCase(), a.id]))
-    return {
-      account,
-      place,
-      groupSize: all.length,
-      history: history.reverse(),
-      champStats: stats?.champStats ?? [],
-      last20: stats?.last20 ?? null,
-      liveGame: row?.liveGame ?? null,
-      matches: page,
-      tracked,
-    }
+    if (await getSessionMember()) return { viewer: 'member' as const, ...(await loadAccountDetail(data.accountId)) }
+    const hit = publicDetailCache.get(data.accountId)
+    if (hit && Date.now() - hit.at < 60_000) return { viewer: 'public' as const, ...hit.value }
+    const full = await loadAccountDetail(data.accountId)
+    const { ownerId: _o, ownerName: _n, shared: _s, hasCredentials: _c, ...account } = full.account
+    const value = { ...full, account }
+    publicDetailCache.set(data.accountId, { at: Date.now(), value })
+    return { viewer: 'public' as const, ...value }
   })
 
 export const getMatchPage = createServerFn({ method: 'GET' })
-  .middleware([memberMiddleware])
   .validator(input(accountIdInput.extend({ before: z.number().int() })))
   .handler(({ data }) => matchPage(data.accountId, data.before))
 

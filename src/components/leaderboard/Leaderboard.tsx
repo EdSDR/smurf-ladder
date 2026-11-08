@@ -137,13 +137,9 @@ function LeaderRow({ a, place, queue, meId }: { a: Row; place: number; queue: Qu
   // Two separate links (account, owner): links can't nest.
   const name = (
     <span className="flex min-w-0 flex-col">
-      {member ? (
-        <Link to="/accounts/$id" params={{ id: String(a.id) }} className="block min-w-0 underline-offset-4 hover:underline">
-          {riot}
-        </Link>
-      ) : (
-        riot
-      )}
+      <Link to="/accounts/$id" params={{ id: String(a.id) }} className="block min-w-0 underline-offset-4 hover:underline">
+        {riot}
+      </Link>
       {member && a.ownerName && (
         <Link to="/members/$id" params={{ id: String(a.ownerId) }} className="block w-fit max-w-full truncate text-xs text-muted-foreground hover:text-foreground">
           {a.ownerName}

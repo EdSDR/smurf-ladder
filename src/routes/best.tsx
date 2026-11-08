@@ -1,4 +1,4 @@
-import { Link, createFileRoute, redirect } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { ChampIcon, PlacementBadge } from '#/components/game/GameArt'
 import { useChampion } from '#/components/game/StaticDataProvider'
@@ -12,9 +12,6 @@ const search = z.object({ range: z.enum(['week', 'month', 'season']).optional() 
 
 export const Route = createFileRoute('/best')({
   validateSearch: search,
-  beforeLoad: ({ context }) => {
-    if (!context.me) throw redirect({ to: '/' })
-  },
   loaderDeps: ({ search }) => ({ range: search.range ?? 'week' }),
   loader: ({ deps }) => getBestGames({ data: { range: deps.range } }),
   head: () => ({ meta: [{ title: 'Best games – Smurf Ladder' }] }),
@@ -44,6 +41,7 @@ function Row({ g, place }: { g: BestGame; place: number }) {
         </Link>
         <div className="truncate text-xs text-muted-foreground">
           {name} in {QUEUE_NAMES[g.queue === 'solo' ? 420 : 440]}, {ago(g.endedAt)}
+          {/* Owners only reach members; visitors get the games without them. */}
           {g.ownerName && (
             <>
               {', '}

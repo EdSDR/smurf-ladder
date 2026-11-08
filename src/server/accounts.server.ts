@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import { UserError } from '#/lib/errors'
+import { rankScore } from '#/lib/tiers'
 import type { Account, Member } from '#/db/schema'
 import type { LpGains } from '#/lib/lpStats'
 import { kda } from '#/lib/matchStats'
@@ -177,3 +178,47 @@ export async function matchPage(accountId: number, before: number | null) {
   }))
 }
 export type MatchEntry = Awaited<ReturnType<typeof matchPage>>[number]
+
+export async function loadAccountDetail(accountId: number) {
+  const db = getDb()
+  const all = await memberAccounts()
+  const account = all.find((a) => a.id === accountId)
+  if (!account) throw new UserError('That account no longer exists.')
+  const [history, [stats], [row], page] = await Promise.all([
+    db
+      .select({
+        queue: schema.rankSnapshots.queue,
+        tier: schema.rankSnapshots.tier,
+        rank: schema.rankSnapshots.rank,
+        lp: schema.rankSnapshots.lp,
+        wins: schema.rankSnapshots.wins,
+        losses: schema.rankSnapshots.losses,
+        takenAt: schema.rankSnapshots.takenAt,
+      })
+      .from(schema.rankSnapshots)
+      .where(eq(schema.rankSnapshots.accountId, accountId))
+      .orderBy(desc(schema.rankSnapshots.takenAt))
+      .limit(300),
+    db.select().from(schema.accountStats).where(eq(schema.accountStats.accountId, accountId)),
+    db.select({ liveGame: schema.accounts.liveGame }).from(schema.accounts).where(eq(schema.accounts.id, accountId)),
+    matchPage(accountId, null),
+  ])
+  const solo = (a: (typeof all)[number]) => rankScore(a.solo?.tier ?? null, a.solo?.rank ?? null, a.solo?.lp ?? null)
+  return {
+    account,
+    place: account.solo ? all.filter((a) => solo(a) > solo(account)).length + 1 : null,
+    groupSize: all.length,
+    history: history.reverse(),
+    champStats: stats?.champStats ?? [],
+    last20: stats?.last20 ?? null,
+    liveGame: row?.liveGame ?? null,
+    matches: page,
+    // Tracked accounts by Riot ID, so lobby lists can link to them.
+    tracked: Object.fromEntries(all.map((a) => [`${a.gameName}#${a.tagLine}`.toLowerCase(), a.id])),
+  }
+}
+
+/** What anyone may see about an account: everything except who added it and its login. */
+export type PublicDetailAccount = Omit<MemberAccount, 'ownerId' | 'ownerName' | 'shared' | 'hasCredentials'>
+export type FullDetail = Awaited<ReturnType<typeof loadAccountDetail>>
+export const publicDetailCache = new Map<number, { at: number; value: Omit<FullDetail, 'account'> & { account: PublicDetailAccount } }>()
