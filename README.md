@@ -23,6 +23,8 @@ It runs entirely on Cloudflare's free plan (Workers, D1, Cron Triggers) and the 
 
 ![A member page: every account they added, top champions and combined match performance](docs/member.png)
 
+![Best games: the group's highest game scores with MVP and ACE placements](docs/best.png)
+
 ## How the game score works
 
 For each ranked game, every player gets six numbers: KDA (capped at 15), kill participation, share of the team's damage, share of the team's gold, CS per minute and vision per minute. Each is divided by the best value in the lobby, then weighted by role (supports lean on vision, junglers on kill participation). The weighted sums are spread so the lobby's best is 10 and its average is 5. MVP is the top player on the winning team, ACE the top player on the losing team. Remakes get no score. It's our own estimate, not an official Riot number.
