@@ -244,7 +244,6 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
     })
   }, [ranked, queue, selected.join(), search.role, search.status, search.shared, search.q]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const inGame = accounts.filter((a) => a.inGame).length
   const decaying = accounts.filter((a) => decaysSoon(a[queue], a.refreshedAt)).length
   const top = ranked[0]
   const filtering = selected.length > 0 || !!search.role || !!search.status || !!search.shared || !!search.q
@@ -263,7 +262,7 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
           <TierStrip accounts={accounts} queue={queue} selected={selected} onToggle={toggleTier} />
         </div>
         <div className="flex flex-wrap items-center gap-1 border-t pt-2 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-2">
-          {member && <SummaryStat label="In game now" value={inGame} onClick={() => update({ status: search.status === 'live' ? undefined : 'live' })} active={search.status === 'live'} />}
+          <SummaryStat label="Accounts" value={accounts.length} />
           {member && (
             <SummaryStat
               label={`Decay within ${DECAY_SOON_DAYS} days`}
