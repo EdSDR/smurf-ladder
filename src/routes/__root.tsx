@@ -3,12 +3,22 @@ import { Toaster } from '#/components/ui/sonner'
 import { TooltipProvider } from '#/components/ui/tooltip'
 import { SiteFooter } from '#/components/SiteFooter'
 import { SiteHeader } from '#/components/SiteHeader'
+import { StaticDataProvider } from '#/components/game/StaticDataProvider'
 import { getMe } from '#/server/auth.functions'
+import { loadStaticData } from '#/server/static.functions'
+import type { StaticData } from '#/server/staticData'
 import { VaultProvider } from '#/vault/VaultProvider'
 import appCss from '../styles.css?url'
 
+// Champion names and icon maps change once a day; the browser fetches them once per visit.
+let staticCache: StaticData | null = null
+
 export const Route = createRootRoute({
-  beforeLoad: async () => ({ me: await getMe() }),
+  beforeLoad: async () => {
+    const [me, staticData] = await Promise.all([getMe(), staticCache ? Promise.resolve(staticCache) : loadStaticData()])
+    if (typeof window !== 'undefined' && staticData) staticCache = staticData
+    return { me, staticData }
+  },
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -48,7 +58,7 @@ export const Route = createRootRoute({
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const { me } = Route.useRouteContext()
+  const { me, staticData } = Route.useRouteContext()
   return (
     <html lang="en" className="dark">
       <head>
@@ -56,12 +66,14 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="flex min-h-dvh flex-col">
         <VaultProvider memberId={me?.id ?? null}>
+          <StaticDataProvider data={staticData}>
           <TooltipProvider>
             <SiteHeader me={me} />
             <div className="flex-1">{children}</div>
             <SiteFooter />
           </TooltipProvider>
           <Toaster position="bottom-center" />
+          </StaticDataProvider>
         </VaultProvider>
         <Scripts />
       </body>

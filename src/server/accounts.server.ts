@@ -2,9 +2,11 @@ import { asc, eq } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import { UserError } from '#/lib/errors'
 import type { Account, Member } from '#/db/schema'
+import type { LpGains } from '#/lib/lpStats'
+import { kda } from '#/lib/matchStats'
 import { currentGroupVersion } from './vault.server'
 
-const { accounts, credentials, members } = schema
+const { accounts, accountStats, credentials, members } = schema
 export const REFRESH_COOLDOWN_MS = 2 * 60 * 1000
 
 export type PublicAccount = {
@@ -34,6 +36,12 @@ export type MemberAccount = PublicAccount & {
   ownerName: string | null
   shared: boolean
   hasCredentials: boolean
+  mainRole: string | null
+  topChamps: number[]
+  lp: { solo: LpGains | null; flex: LpGains | null }
+  last20: { games: number; wins: number; kda: number; avgScore: number | null } | null
+  liveGame: { championId: number; queueId: number; startedAt: number } | null
+  history: { state: 'todo' | 'listed' | 'done'; pending: number; stored: number }
 }
 
 export function queue(
@@ -64,20 +72,32 @@ export function toPublic(a: Account): PublicAccount {
 
 export async function memberAccounts(): Promise<MemberAccount[]> {
   const db = getDb()
-  const [rows, people, creds] = await Promise.all([
+  const [rows, people, creds, stats] = await Promise.all([
     db.select().from(accounts).orderBy(asc(accounts.gameName)),
     db.select({ id: members.id, name: members.name }).from(members),
     db.select({ accountId: credentials.accountId }).from(credentials),
+    db.select().from(accountStats),
   ])
   const names = new Map(people.map((p) => [p.id, p.name]))
   const withCreds = new Set(creds.map((c) => c.accountId))
-  return rows.map((a) => ({
-    ...toPublic(a),
-    ownerId: a.ownerId,
-    ownerName: names.get(a.ownerId) ?? null,
-    shared: a.shared,
-    hasCredentials: withCreds.has(a.id),
-  }))
+  const statsBy = new Map(stats.map((s) => [s.accountId, s]))
+  return rows.map((a) => {
+    const st = statsBy.get(a.id)
+    const l = st?.last20
+    return {
+      ...toPublic(a),
+      ownerId: a.ownerId,
+      ownerName: names.get(a.ownerId) ?? null,
+      shared: a.shared,
+      hasCredentials: withCreds.has(a.id),
+      mainRole: st?.mainRole ?? null,
+      topChamps: (st?.champStats ?? []).slice(0, 3).map((c) => c.champion),
+      lp: st?.lp ?? { solo: null, flex: null },
+      last20: l && l.games ? { games: l.games, wins: l.wins, kda: kda(l.kills, l.deaths, l.assists), avgScore: l.scored ? l.scoreSum / l.scored : null } : null,
+      liveGame: a.liveGame ? { championId: a.liveGame.championId, queueId: a.liveGame.queueId, startedAt: a.liveGame.startedAt } : null,
+      history: { state: a.backfillState, pending: a.matchBacklog.length, stored: Math.max(0, st?.storedGames ?? 0) },
+    }
+  })
 }
 
 export async function requireAccount(id: number) {

@@ -12,7 +12,7 @@ const CSP = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src https://fonts.gstatic.com",
-  "img-src 'self' data: https://raw.communitydragon.org https://cdn.discordapp.com",
+  "img-src 'self' data: https://raw.communitydragon.org https://ddragon.leagueoflegends.com https://cdn.discordapp.com",
   "connect-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",

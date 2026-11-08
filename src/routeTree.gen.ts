@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AddRouteImport } from './routes/add'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as MineRouteImport } from './routes/mine'
+import { Route as BestRouteImport } from './routes/best'
 import { Route as VaultRouteImport } from './routes/vault'
 import { Route as AccountsIdRouteImport } from './routes/accounts.$id'
+import { Route as MembersIndexRouteImport } from './routes/members/index'
+import { Route as MembersIdRouteImport } from './routes/members/$id'
 import { Route as AuthDiscordIndexRouteImport } from './routes/auth/discord/index'
 import { Route as AuthDiscordCallbackRouteImport } from './routes/auth/discord/callback'
 
@@ -33,9 +35,9 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const MineRoute = MineRouteImport.update({
-  id: '/mine',
-  path: '/mine',
+const BestRoute = BestRouteImport.update({
+  id: '/best',
+  path: '/best',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VaultRoute = VaultRouteImport.update({
@@ -46,6 +48,16 @@ const VaultRoute = VaultRouteImport.update({
 const AccountsIdRoute = AccountsIdRouteImport.update({
   id: '/accounts/$id',
   path: '/accounts/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MembersIndexRoute = MembersIndexRouteImport.update({
+  id: '/members/',
+  path: '/members/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MembersIdRoute = MembersIdRouteImport.update({
+  id: '/members/$id',
+  path: '/members/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthDiscordIndexRoute = AuthDiscordIndexRouteImport.update({
@@ -63,9 +75,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/add': typeof AddRoute
   '/admin': typeof AdminRoute
-  '/mine': typeof MineRoute
+  '/best': typeof BestRoute
   '/vault': typeof VaultRoute
   '/accounts/$id': typeof AccountsIdRoute
+  '/members/$id': typeof MembersIdRoute
+  '/members/': typeof MembersIndexRoute
   '/auth/discord/callback': typeof AuthDiscordCallbackRoute
   '/auth/discord/': typeof AuthDiscordIndexRoute
 }
@@ -73,9 +87,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/add': typeof AddRoute
   '/admin': typeof AdminRoute
-  '/mine': typeof MineRoute
+  '/best': typeof BestRoute
   '/vault': typeof VaultRoute
   '/accounts/$id': typeof AccountsIdRoute
+  '/members/$id': typeof MembersIdRoute
+  '/members': typeof MembersIndexRoute
   '/auth/discord/callback': typeof AuthDiscordCallbackRoute
   '/auth/discord': typeof AuthDiscordIndexRoute
 }
@@ -84,9 +100,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/add': typeof AddRoute
   '/admin': typeof AdminRoute
-  '/mine': typeof MineRoute
+  '/best': typeof BestRoute
   '/vault': typeof VaultRoute
   '/accounts/$id': typeof AccountsIdRoute
+  '/members/$id': typeof MembersIdRoute
+  '/members/': typeof MembersIndexRoute
   '/auth/discord/callback': typeof AuthDiscordCallbackRoute
   '/auth/discord/': typeof AuthDiscordIndexRoute
 }
@@ -96,9 +114,11 @@ export interface FileRouteTypes {
     | '/'
     | '/add'
     | '/admin'
-    | '/mine'
+    | '/best'
     | '/vault'
     | '/accounts/$id'
+    | '/members/$id'
+    | '/members/'
     | '/auth/discord/callback'
     | '/auth/discord/'
   fileRoutesByTo: FileRoutesByTo
@@ -106,9 +126,11 @@ export interface FileRouteTypes {
     | '/'
     | '/add'
     | '/admin'
-    | '/mine'
+    | '/best'
     | '/vault'
     | '/accounts/$id'
+    | '/members/$id'
+    | '/members'
     | '/auth/discord/callback'
     | '/auth/discord'
   id:
@@ -116,9 +138,11 @@ export interface FileRouteTypes {
     | '/'
     | '/add'
     | '/admin'
-    | '/mine'
+    | '/best'
     | '/vault'
     | '/accounts/$id'
+    | '/members/$id'
+    | '/members/'
     | '/auth/discord/callback'
     | '/auth/discord/'
   fileRoutesById: FileRoutesById
@@ -127,9 +151,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AddRoute: typeof AddRoute
   AdminRoute: typeof AdminRoute
-  MineRoute: typeof MineRoute
+  BestRoute: typeof BestRoute
   VaultRoute: typeof VaultRoute
   AccountsIdRoute: typeof AccountsIdRoute
+  MembersIdRoute: typeof MembersIdRoute
+  MembersIndexRoute: typeof MembersIndexRoute
   AuthDiscordCallbackRoute: typeof AuthDiscordCallbackRoute
   AuthDiscordIndexRoute: typeof AuthDiscordIndexRoute
 }
@@ -157,11 +183,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/mine': {
-      id: '/mine'
-      path: '/mine'
-      fullPath: '/mine'
-      preLoaderRoute: typeof MineRouteImport
+    '/best': {
+      id: '/best'
+      path: '/best'
+      fullPath: '/best'
+      preLoaderRoute: typeof BestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/vault': {
@@ -176,6 +202,20 @@ declare module '@tanstack/react-router' {
       path: '/accounts/$id'
       fullPath: '/accounts/$id'
       preLoaderRoute: typeof AccountsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/members/': {
+      id: '/members/'
+      path: '/members'
+      fullPath: '/members/'
+      preLoaderRoute: typeof MembersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/members/$id': {
+      id: '/members/$id'
+      path: '/members/$id'
+      fullPath: '/members/$id'
+      preLoaderRoute: typeof MembersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/discord/': {
@@ -199,9 +239,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AddRoute: AddRoute,
   AdminRoute: AdminRoute,
-  MineRoute: MineRoute,
+  BestRoute: BestRoute,
   VaultRoute: VaultRoute,
   AccountsIdRoute: AccountsIdRoute,
+  MembersIdRoute: MembersIdRoute,
+  MembersIndexRoute: MembersIndexRoute,
   AuthDiscordCallbackRoute: AuthDiscordCallbackRoute,
   AuthDiscordIndexRoute: AuthDiscordIndexRoute,
 }

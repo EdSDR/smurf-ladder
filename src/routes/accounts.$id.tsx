@@ -2,7 +2,7 @@ import { Link, createFileRoute, redirect, useRouter } from '@tanstack/react-rout
 import { ChevronLeftIcon, CopyIcon, RefreshCwIcon } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { RankText } from '#/components/AccountRow'
+import { RankLabel } from '#/components/game/GameArt'
 import { CredentialView } from '#/components/CredentialDialog'
 import { LpChart } from '#/components/LpChart'
 import { ProfileIcon } from '#/components/TierMark'
@@ -55,7 +55,7 @@ function QueueStat({ label, q, queue, refreshedAt }: { label: string; q: QueueRa
     <div className="grid gap-1 border-t py-3">
       <dt className="text-sm text-muted-foreground">{label}</dt>
       <dd className="grid gap-0.5">
-        <RankText tier={q?.tier ?? null} rank={q?.rank ?? null} lp={q?.lp} />
+        <RankLabel tier={q?.tier ?? null} rank={q?.rank ?? null} lp={q?.lp} />
         {q && (
           <span className="nums text-sm text-muted-foreground">
             {wr}% win rate, {q.wins}W {q.losses}L
@@ -105,7 +105,7 @@ function AccountDetail() {
             {account.gameName}
             <span className="font-medium text-muted-foreground">#{account.tagLine}</span>
           </h1>
-          <RankText tier={q?.tier ?? null} rank={q?.rank ?? null} lp={q?.lp} className="mt-1 text-lg" />
+          <RankLabel tier={q?.tier ?? null} rank={q?.rank ?? null} lp={q?.lp} className="mt-1 text-lg" />
         </div>
         <div className="flex flex-wrap gap-2">
           <Button

@@ -1,7 +1,7 @@
 import { Link, createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { RankText } from '#/components/AccountRow'
+import { RankLabel } from '#/components/game/GameArt'
 import { ProfileIcon } from '#/components/TierMark'
 import { UnlockForm } from '#/components/UnlockForm'
 import { Button } from '#/components/ui/button'
@@ -104,7 +104,7 @@ function AddAccount() {
                 {preview.gameName}
                 <span className="font-normal text-muted-foreground">#{preview.tagLine}</span>
               </div>
-              <RankText tier={preview.solo?.tier ?? null} rank={preview.solo?.rank ?? null} lp={preview.solo?.lp} className="text-sm" />
+              <RankLabel tier={preview.solo?.tier ?? null} rank={preview.solo?.rank ?? null} lp={preview.solo?.lp} className="text-sm" />
             </div>
             <span className="ml-auto text-sm text-muted-foreground">{preview.level ? `Level ${preview.level}` : ''}</span>
           </div>

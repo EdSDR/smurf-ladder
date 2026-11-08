@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { toast } from 'sonner'
-import { AccountsPage, accountsSearch } from '#/components/AccountsPage'
+import { Leaderboard, leaderboardSearch } from '#/components/leaderboard/Leaderboard'
 import { listAccounts } from '#/server/accounts.functions'
 
 const signinMessages: Record<string, string> = {
@@ -10,7 +10,7 @@ const signinMessages: Record<string, string> = {
 }
 
 export const Route = createFileRoute('/')({
-  validateSearch: accountsSearch.extend({ signin: accountsSearch.shape.q }),
+  validateSearch: leaderboardSearch.extend({ signin: leaderboardSearch.shape.q }),
   loader: () => listAccounts(),
   component: Home,
 })
@@ -28,5 +28,5 @@ function Home() {
     }
   }, [signin, navigate])
 
-  return <AccountsPage accounts={data.accounts} me={me} search={search} scope="all" />
+  return <Leaderboard accounts={data.accounts} me={me} search={search} />
 }
