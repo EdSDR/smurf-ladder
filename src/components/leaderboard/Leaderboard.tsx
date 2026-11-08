@@ -13,7 +13,7 @@ import type { MemberAccount, PublicAccount } from '#/server/accounts.functions'
 import type { Me } from '#/server/auth.functions'
 import { ROLE_NAMES, ROLES } from '#/lib/assets'
 import { DECAY_SOON_DAYS } from '#/lib/decay'
-import { TIERS, TIER_META, isTier, rankScore, tierIndex, winrate } from '#/lib/tiers'
+import { TIERS, TIER_META, isTier, rankScore, winrate } from '#/lib/tiers'
 import { cn } from '#/lib/utils'
 
 export type Queue = 'solo' | 'flex'
@@ -32,15 +32,6 @@ export type LeaderboardSearch = z.infer<typeof leaderboardSearch>
 
 const score = (a: Row, q: Queue) => rankScore(a[q]?.tier ?? null, a[q]?.rank ?? null, a[q]?.lp ?? null)
 const stepOf = (a: Row, q: Queue) => (isTier(a[q]?.tier) ? a[q]!.tier : UNRANKED)
-
-function tierRange(accounts: Row[], queue: Queue) {
-  const ranked = accounts.map((a) => a[queue]?.tier).filter(isTier)
-  if (!ranked.length) return null
-  const sorted = [...ranked].sort((a, b) => tierIndex(a) - tierIndex(b))
-  const low = TIER_META[sorted[0]].name
-  const high = TIER_META[sorted[sorted.length - 1]].name
-  return low === high ? `all ${low}` : `${low} to ${high}`
-}
 
 /** What's left of the staircase: one bar per tier, height by count, click to filter. */
 function TierStrip({ accounts, queue, selected, onToggle }: { accounts: Row[]; queue: Queue; selected: string[]; onToggle: (t: string) => void }) {
@@ -256,7 +247,6 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
   const inGame = accounts.filter((a) => a.inGame).length
   const decaying = accounts.filter((a) => decaysSoon(a[queue], a.refreshedAt)).length
   const top = ranked[0]
-  const range = tierRange(accounts, queue)
   const filtering = selected.length > 0 || !!search.role || !!search.status || !!search.shared || !!search.q
   const toggleTier = (t: string) => {
     const next = selected.includes(t) ? selected.filter((s) => s !== t) : [...selected, t]
@@ -264,15 +254,9 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-8 pb-20 sm:pt-10">
-      <header className="mb-6">
-        <h1 className="wide text-2xl leading-none font-extrabold tracking-tight sm:text-hero">Leaderboard</h1>
-        <p className="mt-2 text-muted-foreground">
-          {accounts.length === 0
-            ? 'No accounts yet.'
-            : `${accounts.length} ${accounts.length === 1 ? 'account' : 'accounts'} on BR${range ? `, ${range}` : ''}.`}
-        </p>
-      </header>
+    <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-20">
+      {/* No visible headline: the summary strip opens the page. Screen readers still get a title. */}
+      <h1 className="sr-only">Leaderboard</h1>
 
       <section aria-label="Summary" className="mb-4 flex flex-col gap-3 rounded-[10px] border bg-panel p-3 sm:flex-row sm:items-stretch">
         <div className="flex h-24 min-w-0 flex-1 px-1">

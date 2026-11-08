@@ -138,7 +138,7 @@ export function SiteHeader({ me }: { me: Me | null }) {
           {me ? (
             <>
               <Search />
-              <Button asChild size="sm" className="hidden sm:inline-flex">
+              <Button asChild size="lg" className="hidden px-3 sm:inline-flex">
                 <Link to="/add">
                   <PlusIcon />
                   Add account
