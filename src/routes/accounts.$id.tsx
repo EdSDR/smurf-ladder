@@ -36,7 +36,7 @@ export const Route = createFileRoute('/accounts/$id')({
   head: ({ loaderData }) => ({ meta: [{ title: loaderData ? `${loaderData.account.gameName}#${loaderData.account.tagLine} – Smurf Ladder` : 'Smurf Ladder' }] }),
   component: AccountDetail,
   errorComponent: ({ error }) => (
-    <main className="mx-auto max-w-6xl px-4 py-24">
+    <main className="mx-auto max-w-7xl px-4 py-24">
       <h1 className="wide text-2xl font-extrabold">{(error as Error).message}</h1>
       <Link to="/" className="mt-4 inline-block underline underline-offset-4">
         Back to the leaderboard
@@ -110,7 +110,7 @@ function AccountDetail() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-20">
+    <main className="mx-auto w-full max-w-7xl px-4 pt-6 pb-20">
       <SplashBanner championId={bannerChamp} className="mb-6">
         <div className="flex min-h-48 flex-col justify-end gap-4 p-5 sm:min-h-56 sm:flex-row sm:items-end sm:justify-between sm:p-7">
           <div className="flex items-end gap-4">

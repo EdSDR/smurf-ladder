@@ -25,7 +25,7 @@ export const Route = createFileRoute('/members/$id')({
   head: ({ loaderData }) => ({ meta: [{ title: loaderData ? `${loaderData.member.name ?? 'Member'} – Smurf Ladder` : 'Smurf Ladder' }] }),
   component: MemberPage,
   errorComponent: ({ error }) => (
-    <main className="mx-auto max-w-6xl px-4 py-24">
+    <main className="mx-auto max-w-7xl px-4 py-24">
       <h1 className="wide text-2xl font-extrabold">{(error as Error).message}</h1>
       <Link to="/members" className="mt-4 inline-block underline underline-offset-4">
         See all members
@@ -154,7 +154,7 @@ function MemberPage() {
   const isMe = me?.id === member.id
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-20">
+    <main className="mx-auto w-full max-w-7xl px-4 pt-6 pb-20">
       <SplashBanner championId={data.bannerChampionId} className="mb-8">
         <div className="flex min-h-56 flex-col justify-end gap-4 p-5 sm:min-h-64 sm:flex-row sm:items-end sm:justify-between sm:p-8">
           <div className="flex items-end gap-5">

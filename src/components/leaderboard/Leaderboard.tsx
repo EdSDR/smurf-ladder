@@ -117,8 +117,10 @@ function WinrateCell({ wins, losses }: { wins: number; losses: number }) {
   )
 }
 
-const COLS_MEMBER = 'md:grid-cols-[2.25rem_1.75rem_minmax(0,1.7fr)_minmax(10.5rem,1.25fr)_4.75rem_minmax(7rem,1fr)_5rem_minmax(0,1.2fr)_4.5rem]'
-const COLS_PUBLIC = 'md:grid-cols-[2.25rem_minmax(0,2fr)_minmax(10.5rem,1.4fr)_minmax(7rem,1fr)]'
+// The full table needs room: from lg it shows the essentials, from xl it adds 24h LP and top champions.
+const COLS_MEMBER =
+  'lg:grid-cols-[2.25rem_1.75rem_minmax(0,1.5fr)_minmax(13rem,1.2fr)_minmax(8rem,1fr)_minmax(11.5rem,1fr)_7.5rem] xl:grid-cols-[2.25rem_1.75rem_minmax(0,1.5fr)_minmax(13rem,1.2fr)_5rem_minmax(8rem,1fr)_5.5rem_minmax(11.5rem,1fr)_7.5rem]'
+const COLS_PUBLIC = 'lg:grid-cols-[2.25rem_minmax(0,2fr)_minmax(13rem,1.4fr)_minmax(8rem,1fr)]'
 
 function LeaderRow({ a, place, queue, meId }: { a: Row; place: number; queue: Queue; meId?: number }) {
   const q = a[queue]
@@ -154,7 +156,7 @@ function LeaderRow({ a, place, queue, meId }: { a: Row; place: number; queue: Qu
     <li
       id={`account-${a.id}`}
       className={cn(
-        'grid scroll-mt-28 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-[10px] border border-transparent bg-panel px-3 py-2.5 target:border-bone md:gap-x-4',
+        'grid scroll-mt-28 grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 rounded-[10px] border border-transparent bg-panel px-3 py-2.5 target:border-bone lg:gap-x-4',
         member ? COLS_MEMBER : COLS_PUBLIC,
       )}
       style={podium ? { borderColor: `color-mix(in oklab, ${TIER_META[q.tier as (typeof TIERS)[number]].color} 55%, transparent)` } : undefined}
@@ -163,7 +165,7 @@ function LeaderRow({ a, place, queue, meId }: { a: Row; place: number; queue: Qu
         {place}
       </span>
       {member && (
-        <span className="hidden md:block">
+        <span className="hidden lg:block">
           <RoleIcon position={a.mainRole ?? null} />
         </span>
       )}
@@ -176,24 +178,24 @@ function LeaderRow({ a, place, queue, meId }: { a: Row; place: number; queue: Qu
         </span>
         {name}
       </span>
-      <span className="col-start-2 row-start-2 md:col-start-auto md:row-start-auto">
+      <span className="col-start-2 row-start-2 lg:col-start-auto lg:row-start-auto">
         <RankLabel tier={q?.tier ?? null} rank={q?.rank ?? null} lp={q?.lp} />
       </span>
       {member && (
-        <span className="hidden md:block">
+        <span className="hidden xl:block">
           <LpChange value={a.lp?.[queue]?.d1 ?? null} />
         </span>
       )}
-      <span className="hidden md:block">{q ? <WinrateCell wins={q.wins} losses={q.losses} /> : <span className="text-sm text-muted-foreground">Not placed</span>}</span>
+      <span className="hidden lg:block">{q ? <WinrateCell wins={q.wins} losses={q.losses} /> : <span className="text-sm text-muted-foreground">Not placed</span>}</span>
       {member && (
-        <span className="hidden items-center -space-x-1.5 md:flex">
+        <span className="hidden items-center -space-x-1.5 xl:flex">
           {(a.topChamps ?? []).map((c) => (
             <ChampIcon key={c} id={c} size={26} className="ring-2 ring-panel rounded-full" />
           ))}
         </span>
       )}
       {member && (
-        <span className="col-span-2 col-start-2 row-start-3 flex flex-wrap items-center gap-x-3 gap-y-1 md:col-span-1 md:col-start-auto md:row-start-auto md:grid md:gap-1">
+        <span className="col-span-2 col-start-2 row-start-3 flex flex-wrap items-center gap-x-3 gap-y-1 lg:col-span-1 lg:col-start-auto lg:row-start-auto lg:grid lg:gap-1">
           {a.liveGame ? (
             <span className="flex items-center gap-1.5 text-sm font-medium">
               <ChampIcon id={a.liveGame.championId} size={20} />
@@ -204,7 +206,7 @@ function LeaderRow({ a, place, queue, meId }: { a: Row; place: number; queue: Qu
         </span>
       )}
       {member ? (
-        <span className="col-start-3 row-span-2 row-start-1 flex items-center justify-end gap-1 md:col-start-auto md:row-span-1 md:row-start-auto">
+        <span className="col-start-3 row-span-2 row-start-1 flex items-center justify-end gap-1 lg:col-start-auto lg:row-span-1 lg:row-start-auto">
           {canSeeLogin && <CredentialDialog accountId={a.id} riotId={riotId} />}
           <Button variant="ghost" size="icon-sm" asChild>
             <Link to="/accounts/$id" params={{ id: String(a.id) }} aria-label={`Open ${riotId}`}>
@@ -253,7 +255,7 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-6 pb-20">
+    <main className="mx-auto w-full max-w-7xl px-4 pt-6 pb-20">
       {/* No visible headline: the summary strip opens the page. Screen readers still get a title. */}
       <h1 className="sr-only">Leaderboard</h1>
 
@@ -336,16 +338,16 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
       </div>
 
       <div
-        className={cn('mb-1 hidden gap-x-4 px-3 text-xs text-muted-foreground md:grid', member ? COLS_MEMBER : COLS_PUBLIC)}
+        className={cn('mb-1 hidden gap-x-4 px-3 text-xs text-muted-foreground lg:grid', member ? COLS_MEMBER : COLS_PUBLIC)}
         aria-hidden
       >
         <span className="text-center">#</span>
         {member && <span>Role</span>}
         <span>Player</span>
         <span>Rank</span>
-        {member && <span>24 hours</span>}
+        {member && <span className="hidden xl:block">24 hours</span>}
         <span>Win rate</span>
-        {member && <span>Top 3</span>}
+        {member && <span className="hidden xl:block">Top 3</span>}
         {member && <span>Status</span>}
         {member && <span />}
       </div>

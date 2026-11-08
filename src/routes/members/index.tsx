@@ -67,7 +67,7 @@ function Card({ m }: { m: MemberCard }) {
 function Members() {
   const members = Route.useLoaderData()
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 pt-8 pb-20 sm:pt-10">
+    <main className="mx-auto w-full max-w-7xl px-4 pt-8 pb-20 sm:pt-10">
       <h1 className="wide text-2xl leading-none font-extrabold tracking-tight sm:text-hero">Members</h1>
       <p className="mt-2 mb-8 text-muted-foreground">Everyone in the group, with their best account and most played champions.</p>
       {members.length ? (

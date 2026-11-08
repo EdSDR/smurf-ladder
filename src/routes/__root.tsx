@@ -36,7 +36,7 @@ export const Route = createRootRoute({
   }),
   shellComponent: RootDocument,
   errorComponent: ({ error }) => (
-    <main className="mx-auto max-w-6xl px-4 py-24">
+    <main className="mx-auto max-w-7xl px-4 py-24">
       <h1 className="wide text-2xl font-extrabold">This page didn’t load</h1>
       <p className="mt-2 max-w-[60ch] text-muted-foreground">{(error as Error).message}</p>
       <a href="/" className="mt-4 inline-block underline underline-offset-4">
@@ -45,7 +45,7 @@ export const Route = createRootRoute({
     </main>
   ),
   notFoundComponent: () => (
-    <main className="mx-auto max-w-6xl px-4 py-24">
+    <main className="mx-auto max-w-7xl px-4 py-24">
       <h1 className="wide text-2xl font-extrabold">Nothing here</h1>
       <p className="mt-2 text-muted-foreground">
         That page doesn’t exist.{' '}

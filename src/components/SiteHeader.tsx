@@ -125,7 +125,7 @@ export function SiteHeader({ me }: { me: Me | null }) {
 
   return (
     <header className="sticky top-0 z-30 border-b bg-rift/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4">
+      <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4">
         <Wordmark />
         <nav className="ml-4 hidden items-stretch md:flex" aria-label="Main">
           {NAV.filter((n) => me || n.to === '/').map((n) => (
