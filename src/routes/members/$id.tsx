@@ -190,23 +190,29 @@ function MemberPage() {
           ) : null}
         </div>
         {shown.length ? (
-          <ul className="flex gap-3 overflow-x-auto pb-2">
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {shown.map((a) => (
-              <li key={a.id} className="shrink-0">
+              <li key={a.id} className="min-w-0">
                 <Link
                   to="/accounts/$id"
                   params={{ id: String(a.id) }}
-                  className={cn('flex w-64 items-center gap-3 rounded-[10px] border bg-panel p-3 transition-colors hover:border-bone/50', a.inGame && 'border-loss/60')}
+                  className={cn('flex h-full min-w-0 items-center gap-3 rounded-[10px] border bg-panel p-3 transition-colors hover:border-bone/50', a.inGame && 'border-loss/60')}
                 >
-                  <ProfileIcon iconId={a.iconId} className="size-11 rounded-full" />
+                  <ProfileIcon iconId={a.iconId} className="size-11 shrink-0 rounded-full" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">
                       {a.gameName}
                       <span className="font-normal text-muted-foreground">#{a.tagLine}</span>
                     </div>
-                    <RankLabel tier={a.solo?.tier ?? a.flex?.tier ?? null} rank={a.solo?.rank ?? a.flex?.rank ?? null} lp={a.solo?.lp ?? a.flex?.lp} className="text-sm" />
+                    {/* Long ranks ("Grandmaster 1936 LP") wrap the LP onto the next line instead of overflowing. */}
+                    <RankLabel
+                      tier={a.solo?.tier ?? a.flex?.tier ?? null}
+                      rank={a.solo?.rank ?? a.flex?.rank ?? null}
+                      lp={a.solo?.lp ?? a.flex?.lp}
+                      className="flex-wrap gap-y-0 text-sm"
+                    />
                   </div>
-                  {a.inGame && <span className="rounded-sm bg-loss px-1 text-[10px] font-bold text-white">Live</span>}
+                  {a.inGame && <span className="shrink-0 rounded-sm bg-loss px-1 text-[10px] font-bold text-white">Live</span>}
                 </Link>
               </li>
             ))}

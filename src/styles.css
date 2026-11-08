@@ -141,6 +141,13 @@
 }
 
 @layer utilities {
+  /* Scrollable without a visible scrollbar, for tab rows on small screens. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
   /* Width carries emphasis instead of all-caps: wide for tier names, narrow for dense data. */
   .wide {
     font-variation-settings: 'wdth' 125;

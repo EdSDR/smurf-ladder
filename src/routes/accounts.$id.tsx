@@ -162,7 +162,7 @@ function AccountDetail() {
       </SplashBanner>
 
       <Tabs defaultValue={account.inGame && liveGame ? 'live' : 'overview'}>
-        <TabsList variant="line" className="mb-5 w-full justify-start overflow-x-auto border-b">
+        <TabsList variant="line" className="no-scrollbar mb-5 w-full justify-start overflow-x-auto overflow-y-hidden border-b">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           {liveGame && (
             <TabsTrigger value="live">
