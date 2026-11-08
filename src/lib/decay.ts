@@ -65,3 +65,29 @@ export function decayState(tier: string | null | undefined, bank: number | null,
 
 /** Flag accounts that will start losing LP within this many days. */
 export const DECAY_SOON_DAYS = 3
+
+/**
+ * Where decay ends and how long it takes to get there, if the account keeps not playing.
+ * - Master and up lose 75 LP a day and land in Diamond II. Riot gives no LP for the landing;
+ *   it's usually around 75 (players report 25–75 depending on MMR).
+ * - Diamond loses 50 LP a day and drops one division each time LP runs out. Diamond IV falls
+ *   to Emerald I, where decay stops (Emerald and below don't decay).
+ */
+export type DecayDrop = { tier: string; rank: string | null; days: number; approxLp: number | null }
+
+const DIVISIONS_DOWN: Record<string, { tier: string; rank: string }> = {
+  I: { tier: 'DIAMOND', rank: 'II' },
+  II: { tier: 'DIAMOND', rank: 'III' },
+  III: { tier: 'DIAMOND', rank: 'IV' },
+  IV: { tier: 'EMERALD', rank: 'I' },
+}
+
+/** Days of decay until the next drop (division or tier), counted from when LP starts falling. */
+export function nextDecayDrop(tier: string | null | undefined, rank: string | null | undefined, lp: number): DecayDrop | null {
+  const rules = decayRules(tier)
+  if (!rules) return null
+  const days = Math.max(1, Math.ceil(lp / rules.lpPerDay))
+  if (rules.group === 'apex') return { tier: 'DIAMOND', rank: 'II', days, approxLp: 75 }
+  const next = DIVISIONS_DOWN[rank ?? 'IV'] ?? DIVISIONS_DOWN.IV
+  return { ...next, days, approxLp: null }
+}

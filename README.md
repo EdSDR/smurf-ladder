@@ -50,6 +50,8 @@ Riot's API doesn't expose the decay bank, so the app rebuilds it from published 
 | Diamond | 7 | 28 | 50 |
 | Master, Grandmaster, Challenger | 1 | 14 | 75 |
 
+When the bank runs out, Master, Grandmaster and Challenger drop to Diamond II (usually around 75 LP; Riot doesn't publish the exact amount), and Diamond falls one division at a time down to Emerald I, where decay stops. The account page shows where an account would land and how many days it would take.
+
 For each Diamond+ queue, the refresh job lists that queue's ranked games from the last 28 days, caches each game's end time (each match is fetched once), and replays them: games add days up to the cap, and one day drains per day. A promotion it has seen into Diamond or Master starts a full bank. The result is an estimate. Riot runs the daily decay at a fixed time we can't see, so it can be off by a day. The in-client profile shows the exact number.
 
 ## How the vault works

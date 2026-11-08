@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bankNow, decayRules, decayState, estimateBank } from '#/lib/decay'
+import { bankNow, decayRules, decayState, estimateBank, nextDecayDrop } from '#/lib/decay'
 
 const DAY = 86_400_000
 const now = Date.UTC(2026, 10, 7, 12)
@@ -51,5 +51,22 @@ describe('decayState', () => {
     expect(decayState('MASTER', 0.5, now, false, now)).toMatchObject({ kind: 'decaying' })
     expect(decayState('DIAMOND', 9.7, now, false, now)).toMatchObject({ kind: 'safe', days: 9, full: false })
     expect(decayState('MASTER', 14, now, false, now)).toMatchObject({ kind: 'safe', days: 14, full: true })
+  })
+})
+
+describe('nextDecayDrop', () => {
+  it('drops apex tiers to Diamond II at about 75 LP', () => {
+    expect(nextDecayDrop('MASTER', null, 312)).toEqual({ tier: 'DIAMOND', rank: 'II', days: 5, approxLp: 75 })
+    expect(nextDecayDrop('GRANDMASTER', null, 75)).toMatchObject({ tier: 'DIAMOND', rank: 'II', days: 1 })
+    expect(nextDecayDrop('CHALLENGER', null, 0)).toMatchObject({ days: 1 })
+  })
+
+  it('drops Diamond one division at a time, and Diamond IV to Emerald I', () => {
+    expect(nextDecayDrop('DIAMOND', 'I', 120)).toEqual({ tier: 'DIAMOND', rank: 'II', days: 3, approxLp: null })
+    expect(nextDecayDrop('DIAMOND', 'IV', 21)).toMatchObject({ tier: 'EMERALD', rank: 'I', days: 1 })
+  })
+
+  it('ignores tiers that never decay', () => {
+    expect(nextDecayDrop('EMERALD', 'I', 99)).toBeNull()
   })
 })

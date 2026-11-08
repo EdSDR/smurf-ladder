@@ -1,5 +1,6 @@
 import { TriangleAlertIcon } from 'lucide-react'
-import { DECAY_SOON_DAYS, DECAY_WINDOW_DAYS, decayState } from '#/lib/decay'
+import { DECAY_SOON_DAYS, DECAY_WINDOW_DAYS, decayState, nextDecayDrop } from '#/lib/decay'
+import { formatRank } from '#/lib/tiers'
 import type { QueueRank } from '#/server/accounts.functions'
 import { cn } from '#/lib/utils'
 
@@ -20,19 +21,28 @@ export function DecayText({
   detailed?: boolean
 }) {
   const state = decayState(q?.tier, q?.bank ?? null, refreshedAt, q?.decayPending ?? false)
-  const base = cn('flex items-center gap-1 text-xs', !detailed && 'whitespace-nowrap', className)
+  const base = cn('flex gap-1 text-xs', detailed ? 'items-start' : 'items-center whitespace-nowrap', className)
 
   if (state.kind === 'none') return detailed ? <span className={cn(base, 'text-muted-foreground')}>No decay below Diamond</span> : null
   if (state.kind === 'pending') return <span className={cn(base, 'text-muted-foreground')}>Checking decay…</span>
 
   const { rules } = state
-  const how = `Estimated from ${queueName[queue]} games in the last ${DECAY_WINDOW_DAYS} days. Each game adds ${rules.perGame} ${rules.perGame === 1 ? 'day' : 'days'}, up to ${rules.cap}. The client shows the exact number.`
+  const drop = q ? nextDecayDrop(q.tier, q.rank, q.lp) : null
+  const landing = drop ? `${formatRank(drop.tier, drop.rank)}${drop.approxLp ? ` (about ${drop.approxLp} LP)` : ''}` : null
+  const how = `Estimated from ${queueName[queue]} games in the last ${DECAY_WINDOW_DAYS} days. Each game adds ${rules.perGame} ${rules.perGame === 1 ? 'day' : 'days'}, up to ${rules.cap}. Once the bank is empty it loses ${rules.lpPerDay} LP a day${landing ? ` and falls to ${landing}` : ''}. The client shows the exact number.`
 
   if (state.kind === 'decaying') {
     return (
       <span className={cn(base, 'font-semibold text-foreground')} title={how}>
-        <TriangleAlertIcon className="size-3.5" style={{ color: 'var(--tier-grandmaster)' }} aria-hidden />
-        Decaying −{rules.lpPerDay} LP/day
+        <TriangleAlertIcon className={cn('size-3.5 shrink-0', detailed && 'mt-0.5')} style={{ color: 'var(--tier-grandmaster)' }} aria-hidden />
+        <span>
+          Decaying −{rules.lpPerDay} LP/day
+          {detailed && drop && (
+            <span className="block font-normal text-muted-foreground">
+              Drops to {landing} in {drop.days} {drop.days === 1 ? 'day' : 'days'} without a ranked game.
+            </span>
+          )}
+        </span>
       </span>
     )
   }
@@ -40,10 +50,15 @@ export function DecayText({
   const soon = state.days <= DECAY_SOON_DAYS
   return (
     <span className={cn(base, soon ? 'font-semibold text-foreground' : 'text-muted-foreground')} title={how}>
-      {soon && <TriangleAlertIcon className="size-3.5" style={{ color: 'var(--tier-gold)' }} aria-hidden />}
+      {soon && <TriangleAlertIcon className={cn('size-3.5 shrink-0', detailed && 'mt-0.5')} style={{ color: 'var(--tier-gold)' }} aria-hidden />}
       <span>
         {`Decays in ${state.days} ${state.days === 1 ? 'day' : 'days'}`}
         {detailed && <span className="font-normal text-muted-foreground">{state.full ? ', bank full' : `, about ${state.days} of ${rules.cap} days banked`}</span>}
+        {detailed && drop && (
+          <span className="block font-normal text-muted-foreground">
+            After that it loses {rules.lpPerDay} LP a day and falls to {landing} after {drop.days} {drop.days === 1 ? 'day' : 'days'}.
+          </span>
+        )}
       </span>
     </span>
   )
