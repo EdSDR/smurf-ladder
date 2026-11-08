@@ -320,7 +320,7 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
               All
             </ToggleGroupItem>
             {ROLES.map((r) => (
-              <ToggleGroupItem key={r} value={r} aria-label={ROLE_NAMES[r]} title={ROLE_NAMES[r]}>
+              <ToggleGroupItem key={r} value={r} aria-label={ROLE_NAMES[r]} title={ROLE_NAMES[r]} className="data-[state=on]:[&_img]:brightness-0">
                 <RoleIcon position={r} className="size-4" />
               </ToggleGroupItem>
             ))}

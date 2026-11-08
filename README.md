@@ -2,18 +2,34 @@
 
 Every League of Legends account your group shares, on one ladder. Pick a tier and see which accounts can play there. No more logging in to each one to check its rank.
 
-![The ladder: accounts pinned on their tier, with the list below](docs/ladder.png)
+![The leaderboard: tier strip, filters and ranked rows with role, LP change, win rate, top champions and status](docs/ladder.png)
 
-- **The ladder.** Every account is pinned on its tier, from Iron to Challenger, for Solo/Duo or Flex. Click a tier to filter.
-- **Live status.** Ranks, win rates and "in game now" refresh automatically every few minutes.
-- **Decay countdown.** Diamond+ accounts show how many days are left before they start losing LP, separately for Solo/Duo and Flex. A filter lists everything that decays within 3 days.
-- **Rank history.** Each account keeps a chart of its LP over time.
-- **End-to-end encrypted logins.** Each account can store its login. You choose whether it's shared with every member or private to you. Logins are encrypted in the browser, and the server only ever holds ciphertext.
-- **Members only.** Members sign in with Discord and must be on an allowlist. Anyone can see the public ladder (Riot ID and rank). Owners and logins are visible to members only.
+Three main screens, inspired by [TrackDiff](https://trackdiff.com):
+
+- **Leaderboard.** Every account ranked for Solo/Duo or Flex, with a tier strip you can click to filter, main role, 24-hour LP change, win rate, top 3 champions, and whether it's in a game or about to decay. Filter by role, status or name.
+- **Account page.** A splash-art banner, ranked cards with peak, progress and 7/30-day LP, most played champions, LP history, and match history: every ranked game with its placement (MVP, ACE, 2nd–10th), LP change, KDA, CS, items, runes and both teams. A live tab shows the current game while the account is playing.
+- **Member page.** Everyone's accounts in one place, with combined top champions and match performance. Members choose their banner champion and a tagline.
+
+Also:
+
+- **Game score.** Our own 0–10 rating per game, comparing each player with the other nine (KDA, kill share, damage, gold, CS, vision). The **Best games** board ranks the group's top scores by week, month or season.
+- **Decay countdown.** Diamond+ accounts show the days left before they lose LP, per queue.
+- **End-to-end encrypted logins.** Each account can store its login, shared with every member or private to you. Logins are encrypted in the browser, and the server only ever holds ciphertext.
+- **Members only.** Members sign in with Discord and must be on an allowlist. The public sees only the leaderboard (Riot ID and rank); everything else needs signing in.
 
 It runs entirely on Cloudflare's free plan (Workers, D1, Cron Triggers) and the free Riot API.
 
-![An account’s page: rank history and decay countdown for each queue](docs/account.png)
+![An account page: splash banner, ranked cards, match performance with game scores, and match history](docs/account.png)
+
+![A member page: every account they added, top champions and combined match performance](docs/member.png)
+
+## How the game score works
+
+For each ranked game, every player gets six numbers: KDA (capped at 15), kill participation, share of the team's damage, share of the team's gold, CS per minute and vision per minute. Each is divided by the best value in the lobby, then weighted by role (supports lean on vision, junglers on kill participation). The weighted sums are spread so the lobby's best is 10 and its average is 5. MVP is the top player on the winning team, ACE the top player on the losing team. Remakes get no score. It's our own estimate, not an official Riot number.
+
+## How match history loads
+
+A cron job runs every 2 minutes with a budget of 40 Riot calls. Accounts in a game refresh every 5 minutes, accounts played in the last day every 10, and the rest every 30. Match IDs are only requested when an account's ranked game count goes up, and each match is fetched once, even when several tracked accounts played in it. Leftover budget backfills the last 50 ranked games of each account (100 for Diamond and up, to cover the 28-day decay window). Per-account stats are precomputed, so pages never scan match history.
 
 ## Stack
 
@@ -97,7 +113,7 @@ To exercise the refresh job without a Riot key, run `node scripts/fake-riot.mjs`
 
 ### Free-tier budget
 
-The cron runs every 5 minutes with a budget of 48 Riot calls, under the free plan's 50 outbound requests per run and Riot's 100 requests per 2 minutes. Each account costs 2 calls, plus 1 per Diamond+ queue for its match list, plus 1 per ranked game it hasn't seen before. The stalest accounts go first until the budget runs out, so a group of ~50 accounts cycles in well under an hour. A new Master account with a long backlog shows "Checking decay…" until its games are cached. Rank snapshots are written only when something changed.
+Each cron run stays under the free plan's 50 outbound requests and 50 D1 queries per invocation (it counts both and stops early), and under Riot's 100 requests per 2 minutes. Backfilling 40 accounts takes several hours the first time, then only new games are fetched. Rank snapshots are written only when something changed, and each account keeps its newest 100 games.
 
 ## Legal
 
