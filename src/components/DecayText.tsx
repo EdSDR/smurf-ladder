@@ -20,7 +20,7 @@ export function DecayText({
   detailed?: boolean
 }) {
   const state = decayState(q?.tier, q?.bank ?? null, refreshedAt, q?.decayPending ?? false)
-  const base = cn('flex items-center gap-1 text-xs', className)
+  const base = cn('flex items-center gap-1 text-xs', !detailed && 'whitespace-nowrap', className)
 
   if (state.kind === 'none') return detailed ? <span className={cn(base, 'text-muted-foreground')}>No decay below Diamond</span> : null
   if (state.kind === 'pending') return <span className={cn(base, 'text-muted-foreground')}>Checking decay…</span>
@@ -32,7 +32,7 @@ export function DecayText({
     return (
       <span className={cn(base, 'font-semibold text-foreground')} title={how}>
         <TriangleAlertIcon className="size-3.5" style={{ color: 'var(--tier-grandmaster)' }} aria-hidden />
-        Decaying, −{rules.lpPerDay} LP a day
+        Decaying −{rules.lpPerDay} LP/day
       </span>
     )
   }

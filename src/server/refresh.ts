@@ -146,10 +146,12 @@ async function storeMatches(ids: string[], ctx: RunContext, stmts: Stmt[], touch
   const db = getDb()
   const done: string[] = []
   if (!ids.length || !ctx.canQuery) return done
-  const existing = await ctx.q(db.select().from(matches).where(inArray(matches.matchId, ids.slice(0, 50))))
+  // Look at a window that fits D1's 100-parameter limit; the rest waits for the next run.
+  const window = ids.slice(0, ctx.maxMatches + 20)
+  const existing = await ctx.q(db.select().from(matches).where(inArray(matches.matchId, window)))
   const stored = new Map(existing.map((m) => [m.matchId, m]))
 
-  for (const id of ids) {
+  for (const id of window) {
     const have = stored.get(id)
     let parsed: ParsedMatch
     if (have) {
@@ -302,15 +304,15 @@ async function loadStats(accountId: number, ctx: RunContext) {
   return row ?? null
 }
 
+/**
+ * Which of `ids` this account already has. Loads the account's stored IDs (at most ~120) rather
+ * than an IN list: D1 allows only 100 bound parameters per query, and a backfill lists 100 IDs.
+ */
 async function knownMatchIds(accountId: number, ids: string[], ctx: RunContext) {
   if (!ids.length) return new Set<string>()
-  const rows = await ctx.q(
-    getDb()
-      .select({ id: matchPlayers.matchId })
-      .from(matchPlayers)
-      .where(and(eq(matchPlayers.accountId, accountId), inArray(matchPlayers.matchId, ids))),
-  )
-  return new Set(rows.map((r) => r.id))
+  const rows = await ctx.q(getDb().select({ id: matchPlayers.matchId }).from(matchPlayers).where(eq(matchPlayers.accountId, accountId)))
+  const stored = new Set(rows.map((r) => r.id))
+  return new Set(ids.filter((id) => stored.has(id)))
 }
 
 function markOthersDirty(touched: Set<number>, selfId: number, stmts: Stmt[]) {

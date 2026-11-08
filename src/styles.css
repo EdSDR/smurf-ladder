@@ -15,16 +15,16 @@
 @custom-variant data-selected (&:where([data-selected]:not([data-selected="false"])));
 
 /*
-  Rift night: one navy base, bone text, and the ten tier colors as the only hues.
-  Tier colors are tuned to ≥5:1 on both rift and panel so they work as text.
+  TrackDiff-style palette: neutral near-black surfaces, white text, team blue and red for
+  results, gold for MVP. Tier colors stay for ranks and are tuned to ≥5:1 on every surface.
 */
 :root {
-  --rift: #0f1a24;
-  --panel: #172532;
-  --panel-raised: #1d2e3e;
-  --line: #263848;
-  --bone: #e9e4d6;
-  --muted-ink: #8a97a3;
+  --rift: #0c0e12;
+  --panel: #16181d;
+  --panel-raised: #1f2229;
+  --line: #262931;
+  --bone: #f5f6f8;
+  --muted-ink: #9ba0a9;
 
   --tier-iron: #a0968f;
   --tier-bronze: #c98a63;
@@ -38,14 +38,14 @@
   --tier-challenger: #f0c95a;
 
   /* Results and changes. Never the only signal: rows and chips also carry a word or sign. */
-  --win: #4e8ef7;
-  --win-tint: #16273d;
-  --loss: #e0525a;
-  --loss-tint: #2e1c24;
-  --gain: #3fc983;
-  --drop: #f07a72;
-  --mvp: #f0b33c;
-  --ace: #b98cf0;
+  --win: #0093ff;
+  --win-tint: #0f1b2b;
+  --loss: #ff1b48;
+  --loss-tint: #27121a;
+  --gain: #1dd360;
+  --drop: #f02e48;
+  --mvp: #f4c874;
+  --ace: #ff6b85;
 
   /* shadcn tokens mapped onto the palette */
   --radius: 0.375rem;

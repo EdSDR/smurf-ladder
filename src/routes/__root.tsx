@@ -25,7 +25,7 @@ export const Route = createRootRoute({
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'Smurf Ladder' },
       { name: 'description', content: 'Every shared League account on one ladder, so you know which one to play.' },
-      { name: 'theme-color', content: '#0f1a24' },
+      { name: 'theme-color', content: '#0c0e12' },
     ],
     links: [
       { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
