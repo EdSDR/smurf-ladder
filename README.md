@@ -29,6 +29,10 @@ It runs entirely on Cloudflare's free plan (Workers, D1, Cron Triggers) and the 
 
 For each ranked game, every player gets six numbers: KDA (capped at 15), kill participation, share of the team's damage, share of the team's gold, CS per minute and vision per minute. Each is divided by the best value in the lobby, then weighted by role (supports lean on vision, junglers on kill participation). The weighted sums are spread so the lobby's best is 10 and its average is 5. MVP is the top player on the winning team, ACE the top player on the losing team. Remakes get no score. It's our own estimate, not an official Riot number.
 
+## Where the game art comes from
+
+Rank crests and role icons ship with the site in `public/assets` (about 30 KB; they rarely change). Champion icons, splash art, items, spells and runes load from [Data Dragon](https://developer.riotgames.com/docs/lol#data-dragon), Riot's official CDN, using a champion list the cron refreshes once a day. Profile icons load from CommunityDragon because its JPGs are about five times smaller than Data Dragon's PNGs. None of this uses the Riot API key.
+
 ## How match history loads
 
 A cron job runs every 2 minutes with a budget of 40 Riot calls. Accounts in a game refresh every 5 minutes, accounts played in the last day every 10, and the rest every 30. Match IDs are only requested when an account's ranked game count goes up, and each match is fetched once, even when several tracked accounts played in it. Leftover budget backfills the last 50 ranked games of each account (100 for Diamond and up, to cover the 28-day decay window). Per-account stats are precomputed, so pages never scan match history.

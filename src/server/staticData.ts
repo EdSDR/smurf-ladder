@@ -2,12 +2,12 @@ import { eq, notInArray } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 
 /**
- * Champion names, spell and rune icons, refreshed once a day from Riot's public CDNs (Data Dragon
- * and CommunityDragon). These don't count against the Riot API key, only the Worker's request limit.
+ * Champion names and keys, spell and rune icons, refreshed once a day from Data Dragon (Riot's
+ * official CDN). These don't count against the Riot API key, only the Worker's request limit.
  */
 export type StaticData = {
   version: string
-  /** championId → [name, alias]. The alias builds splash URLs (e.g. Wukong → MonkeyKing). */
+  /** championId → [name, key]. The key builds icon and splash URLs (e.g. Wukong → MonkeyKing). */
   champions: Record<number, [string, string]>
   /** summoner spell id → image file name */
   spells: Record<number, string>
@@ -15,7 +15,8 @@ export type StaticData = {
   runes: Record<number, string>
 }
 
-const KEY = 'static'
+// v2: champion keys come from Data Dragon (CommunityDragon spelled some differently, e.g. FiddleSticks).
+const KEY = 'static-v2'
 const DAY = 86_400_000
 export const STATIC_FETCHES = 4
 
@@ -44,16 +45,14 @@ export async function refreshStaticDataIfStale(now = Date.now()): Promise<boolea
   const [version] = await json<string[]>('https://ddragon.leagueoflegends.com/api/versions.json')
   const dd = `https://ddragon.leagueoflegends.com/cdn/${version}/data/en_US`
   const [champions, spells, runes] = await Promise.all([
-    json<{ id: number; name: string; alias: string }[]>(
-      'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-summary.json',
-    ),
+    json<{ data: Record<string, { id: string; key: string; name: string }> }>(`${dd}/champion.json`),
     json<{ data: Record<string, { key: string; image: { full: string } }> }>(`${dd}/summoner.json`),
     json<{ id: number; icon: string; slots: { runes: { id: number; icon: string }[] }[] }[]>(`${dd}/runesReforged.json`),
   ])
 
   const data: StaticData = {
     version,
-    champions: Object.fromEntries(champions.filter((c) => c.id > 0).map((c) => [c.id, [c.name, c.alias]])),
+    champions: Object.fromEntries(Object.values(champions.data).map((c) => [Number(c.key), [c.name, c.id]])),
     spells: Object.fromEntries(Object.values(spells.data).map((s) => [Number(s.key), s.image.full])),
     runes: Object.fromEntries(runes.flatMap((style) => [[style.id, style.icon], ...style.slots.flatMap((s) => s.runes.map((r) => [r.id, r.icon]))])),
   }
@@ -62,6 +61,7 @@ export async function refreshStaticDataIfStale(now = Date.now()): Promise<boolea
       .insert(schema.appMeta)
       .values({ key: KEY, value: data, updatedAt: now })
       .onConflictDoUpdate({ target: schema.appMeta.key, set: { value: data, updatedAt: now } }),
+    db.delete(schema.appMeta).where(eq(schema.appMeta.key, 'static')), // pre-v2 champion list
     // Once a day, drop stored matches no tracked account refers to any more.
     db.delete(schema.matches).where(notInArray(schema.matches.matchId, db.select({ id: schema.matchPlayers.matchId }).from(schema.matchPlayers))),
   ])

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, LabelList, ReferenceLine, XAxis, YAxis } from 'recharts'
 import { ChampIcon, LpChange, RoleIcon } from '#/components/game/GameArt'
+import { useStaticData } from '#/components/game/StaticDataProvider'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '#/components/ui/chart'
 import { champIconUrl, ROLE_NAMES, ROLES } from '#/lib/assets'
 import { kda, type ChampStat, type Summary } from '#/lib/matchStats'
@@ -38,6 +39,11 @@ function useNarrow() {
 function ScoreChart({ games }: { games: ChartGame[] }) {
   // Phones get the last 10 games so champion icons stay legible.
   const narrow = useNarrow()
+  const staticData = useStaticData()
+  const icon = (id: number) => {
+    const key = staticData?.champions[id]?.[1]
+    return key && staticData ? champIconUrl(staticData.version, key) : undefined
+  }
   // A game can appear twice when two tracked accounts played it, so keys use the position.
   const data = [...games.slice(0, narrow ? 10 : 20)].reverse().map((g, i) => ({ ...g, i, key: `${g.matchId}-${g.accountId ?? 0}-${i}`, value: g.score ?? 0 }))
   const Tick = ({ x, y, payload }: { x?: number; y?: number; payload?: { value: number } }) => {
@@ -49,7 +55,7 @@ function ScoreChart({ games }: { games: ChartGame[] }) {
         <clipPath id={`clip-${g.key}`}>
           <circle cx={0} cy={13} r={10} />
         </clipPath>
-        <image href={champIconUrl(g.championId)} x={-10} y={3} width={20} height={20} clipPath={`url(#clip-${g.key})`} />
+        <image href={icon(g.championId)} x={-10} y={3} width={20} height={20} clipPath={`url(#clip-${g.key})`} />
         <circle cx={0} cy={13} r={10.5} fill="none" stroke={g.win ? 'var(--win)' : 'var(--loss)'} strokeWidth={1.5} />
         <text x={0} y={38} textAnchor="middle" fontSize={10} fontWeight={700} fill={color}>
           {g.placement ? placementLabel(g.placement, g.badge) : 'Rmk'}

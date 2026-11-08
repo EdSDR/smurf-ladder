@@ -1,4 +1,4 @@
-import { champIconUrl, itemIconUrl, ROLE_NAMES, roleIconUrl, runeIconUrl, spellIconUrl, tierCrestUrl } from '#/lib/assets'
+import { champIconUrl, itemIconUrl, splashUrl, ROLE_NAMES, roleIconUrl, runeIconUrl, spellIconUrl, tierCrestUrl } from '#/lib/assets'
 import { TIER_META, formatRank, isTier } from '#/lib/tiers'
 import { cn } from '#/lib/utils'
 import { useChampion, useStaticData } from './StaticDataProvider'
@@ -42,11 +42,13 @@ export function ChampIcon({
   ring?: 'win' | 'loss'
   className?: string
 }) {
-  const { name } = useChampion(id)
+  const { name, alias } = useChampion(id)
+  const data = useStaticData()
+  const src = alias && data ? champIconUrl(data.version, alias) : null
   return (
     <span className={cn('relative inline-block shrink-0', className)} style={{ width: size, height: size }} title={name}>
       <img
-        src={champIconUrl(id)}
+        src={src ?? undefined}
         alt={name}
         width={size}
         height={size}
@@ -64,8 +66,9 @@ export function ChampIcon({
 }
 
 export function RoleIcon({ position, className }: { position: string | null; className?: string }) {
-  if (!position) return <span className={cn('inline-block size-5', className)} aria-hidden />
-  return <img src={roleIconUrl(position)} alt={ROLE_NAMES[position] ?? position} title={ROLE_NAMES[position]} className={cn('size-5 opacity-80', className)} loading="lazy" />
+  const src = position ? roleIconUrl(position) : null
+  if (!position || !src) return <span className={cn('inline-block size-5', className)} aria-hidden />
+  return <img src={src} alt={ROLE_NAMES[position] ?? position} title={ROLE_NAMES[position]} className={cn('size-5 opacity-80', className)} loading="lazy" />
 }
 
 export function ItemIcon({ id, size = 22 }: { id: number; size?: number }) {
@@ -126,7 +129,7 @@ export function SplashBanner({ championId, className, children }: { championId: 
     <div className={cn('relative isolate overflow-hidden rounded-[10px] border', className)}>
       {alias && (
         <img
-          src={`https://ddragon.leagueoflegends.com/cdn/img/champion/centered/${alias}_0.jpg`}
+          src={splashUrl(alias)}
           alt=""
           className="banner-in absolute inset-0 -z-10 size-full object-cover object-[center_25%]"
         />

@@ -1,6 +1,7 @@
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { ChampIcon, RankLabel } from '#/components/game/GameArt'
 import { useChampion } from '#/components/game/StaticDataProvider'
+import { splashUrl } from '#/lib/assets'
 import { listMembers } from '#/server/members.functions'
 
 export const Route = createFileRoute('/members/')({
@@ -26,7 +27,7 @@ function Card({ m }: { m: MemberCard }) {
         <div className="relative h-24 overflow-hidden">
           {alias && (
             <img
-              src={`https://ddragon.leagueoflegends.com/cdn/img/champion/centered/${alias}_0.jpg`}
+              src={splashUrl(alias)}
               alt=""
               loading="lazy"
               className="absolute inset-0 size-full object-cover object-[center_25%] opacity-70 transition-opacity group-hover:opacity-90"
