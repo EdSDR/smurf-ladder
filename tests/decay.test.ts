@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bankNow, decayRules, decayState, estimateBank, nextDecayDrop } from '#/lib/decay'
+import { atDecayFloor, bankNow, decayRules, decayState, estimateBank, nextDecayDrop } from '#/lib/decay'
 
 const DAY = 86_400_000
 const now = Date.UTC(2026, 10, 7, 12)
@@ -68,5 +68,27 @@ describe('nextDecayDrop', () => {
 
   it('ignores tiers that never decay', () => {
     expect(nextDecayDrop('EMERALD', 'I', 99)).toBeNull()
+  })
+})
+
+describe('Diamond II 75 LP floor for accounts that reached Master', () => {
+  it('knows when an account is already at its floor', () => {
+    expect(atDecayFloor('DIAMOND', 'II', 75, 'MASTER')).toBe(true)
+    expect(atDecayFloor('DIAMOND', 'III', 40, 'GRANDMASTER')).toBe(true)
+    expect(atDecayFloor('DIAMOND', 'II', 90, 'MASTER')).toBe(false)
+    expect(atDecayFloor('DIAMOND', 'II', 75, 'DIAMOND')).toBe(false) // never reached Master
+    expect(atDecayFloor('MASTER', null, 10, 'MASTER')).toBe(false)
+  })
+
+  it('reports the floor instead of decaying', () => {
+    expect(decayState('DIAMOND', 0, now, false, now, { rank: 'II', lp: 75, peakTier: 'MASTER' })).toEqual({ kind: 'floor' })
+    expect(decayState('DIAMOND', 0, now, false, now, { rank: 'II', lp: 75, peakTier: 'DIAMOND' })).toMatchObject({ kind: 'decaying' })
+  })
+
+  it('stops the projection at Diamond II 75 LP', () => {
+    expect(nextDecayDrop('DIAMOND', 'I', 21, 'MASTER')).toEqual({ tier: 'DIAMOND', rank: 'II', days: 1, approxLp: 75 })
+    expect(nextDecayDrop('DIAMOND', 'II', 90, 'MASTER')).toMatchObject({ rank: 'II', approxLp: 75, days: 1 })
+    expect(nextDecayDrop('DIAMOND', 'II', 75, 'MASTER')).toBeNull()
+    expect(nextDecayDrop('DIAMOND', 'I', 21, 'DIAMOND')).toMatchObject({ rank: 'II', approxLp: null })
   })
 })

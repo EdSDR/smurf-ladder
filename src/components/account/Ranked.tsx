@@ -84,7 +84,7 @@ export function RankedCard({ label, queue, q, lp, refreshedAt }: { label: string
               </span>
             </div>
           )}
-          <DecayText q={q} queue={queue} refreshedAt={refreshedAt} detailed className="text-sm" />
+          <DecayText q={q} queue={queue} refreshedAt={refreshedAt} peakTier={peak?.tier} detailed className="text-sm" />
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">Not placed in {label} this season.</p>

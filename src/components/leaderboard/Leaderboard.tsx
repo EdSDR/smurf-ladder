@@ -198,7 +198,7 @@ function LeaderRow({ a, place, queue, meId }: { a: Row; place: number; queue: Qu
               In game <LiveSince startedAt={a.liveGame.startedAt} />
             </span>
           ) : null}
-          <DecayText q={q} queue={queue} refreshedAt={a.refreshedAt} />
+          <DecayText q={q} queue={queue} refreshedAt={a.refreshedAt} peakTier={a.lp?.[queue]?.peak?.tier} />
         </span>
       )}
       {member ? (
@@ -235,14 +235,14 @@ export function Leaderboard({ accounts, me, search }: { accounts: Row[]; me: Me 
       if (search.role && a.mainRole !== search.role) return false
       if (search.status === 'live' && !a.inGame) return false
       if (search.status === 'free' && a.inGame) return false
-      if (search.status === 'decay' && !decaysSoon(a[queue], a.refreshedAt)) return false
+      if (search.status === 'decay' && !decaysSoon(a[queue], a.refreshedAt, a.lp?.[queue]?.peak?.tier)) return false
       if (search.shared && !(a.shared && a.hasCredentials)) return false
       if (needle && !`${a.gameName}#${a.tagLine} ${a.ownerName ?? ''}`.toLowerCase().includes(needle)) return false
       return true
     })
   }, [ranked, queue, selected.join(), search.role, search.status, search.shared, search.q]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const decaying = accounts.filter((a) => decaysSoon(a[queue], a.refreshedAt)).length
+  const decaying = accounts.filter((a) => decaysSoon(a[queue], a.refreshedAt, a.lp?.[queue]?.peak?.tier)).length
   const top = ranked[0]
   const filtering = selected.length > 0 || !!search.role || !!search.status || !!search.shared || !!search.q
   const toggleTier = (t: string) => {

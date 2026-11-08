@@ -1,4 +1,4 @@
-import { APEX } from './tiers'
+import { APEX, rankScore } from './tiers'
 
 /**
  * Riot's inactivity rules (support.riotgames.com, "Placements, Promotions, Series, Demotions,
@@ -48,15 +48,41 @@ export function bankNow(bank: number, asOf: number, now = Date.now()) {
   return Math.max(0, bank - (now - asOf) / DAY)
 }
 
+/**
+ * An account that reached Master or higher stops decaying at Diamond II 75 LP. We know it reached
+ * Master from the season peak we've recorded.
+ */
+export const APEX_FLOOR = { tier: 'DIAMOND', rank: 'II', lp: 75 } as const
+const APEX_FLOOR_SCORE = rankScore(APEX_FLOOR.tier, APEX_FLOOR.rank, APEX_FLOOR.lp)
+
+export function reachedApex(peakTier: string | null | undefined) {
+  return !!peakTier && APEX.has(peakTier)
+}
+
+/** True when the account sits at (or below) its floor, so decay can't take anything more. */
+export function atDecayFloor(tier: string | null | undefined, rank: string | null | undefined, lp: number, peakTier: string | null | undefined) {
+  if (!reachedApex(peakTier) || !tier || APEX.has(tier)) return false
+  return rankScore(tier, rank ?? null, lp) <= APEX_FLOOR_SCORE
+}
+
 export type DecayState =
   | { kind: 'none' }
   | { kind: 'pending' }
+  | { kind: 'floor' }
   | { kind: 'safe'; days: number; full: boolean; rules: DecayRules }
   | { kind: 'decaying'; rules: DecayRules }
 
-export function decayState(tier: string | null | undefined, bank: number | null, asOf: number, pending: boolean, now = Date.now()): DecayState {
+export function decayState(
+  tier: string | null | undefined,
+  bank: number | null,
+  asOf: number,
+  pending: boolean,
+  now = Date.now(),
+  floor?: { rank: string | null | undefined; lp: number; peakTier: string | null | undefined },
+): DecayState {
   const rules = decayRules(tier)
   if (!rules) return { kind: 'none' }
+  if (floor && atDecayFloor(tier, floor.rank, floor.lp, floor.peakTier)) return { kind: 'floor' }
   if (pending || bank === null) return { kind: 'pending' }
   const left = bankNow(bank, asOf, now)
   if (left < 1) return { kind: 'decaying', rules }
@@ -83,11 +109,17 @@ const DIVISIONS_DOWN: Record<string, { tier: string; rank: string }> = {
 }
 
 /** Days of decay until the next drop (division or tier), counted from when LP starts falling. */
-export function nextDecayDrop(tier: string | null | undefined, rank: string | null | undefined, lp: number): DecayDrop | null {
+export function nextDecayDrop(tier: string | null | undefined, rank: string | null | undefined, lp: number, peakTier?: string | null): DecayDrop | null {
   const rules = decayRules(tier)
   if (!rules) return null
+  if (atDecayFloor(tier, rank, lp, peakTier)) return null
   const days = Math.max(1, Math.ceil(lp / rules.lpPerDay))
   if (rules.group === 'apex') return { tier: 'DIAMOND', rank: 'II', days, approxLp: 75 }
+  // Accounts that reached Master stop at Diamond II 75 LP instead of falling further.
+  if (reachedApex(peakTier)) {
+    if (rank === 'II') return { tier: 'DIAMOND', rank: 'II', days: 1, approxLp: APEX_FLOOR.lp }
+    if (rank === 'I') return { tier: 'DIAMOND', rank: 'II', days, approxLp: APEX_FLOOR.lp }
+  }
   const next = DIVISIONS_DOWN[rank ?? 'IV'] ?? DIVISIONS_DOWN.IV
   return { ...next, days, approxLp: null }
 }
