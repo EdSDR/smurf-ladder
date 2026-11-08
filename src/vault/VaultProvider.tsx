@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { getVaultState, setupVault } from '#/server/vault.functions'
 import { createMemberKeys, generateAesKey, groupKeyFingerprint, keysMatch, openPrivateKey, unwrapWithPrivateKey, wrapForMember } from './crypto'
-import { forgetKeys, loadGroupPin, loadPrivateKey, saveGroupPin, savePrivateKey } from './keystore'
+import { idleExpired, lastActive, markActive } from './idle'
+import { forgetKeys, forgetPrivateKey, loadGroupPin, loadPrivateKey, saveGroupPin, savePrivateKey } from './keystore'
 import type { SealedCredential } from './credentials'
 import { openCredential, sealCredential } from './credentials'
 import type { Credential } from './crypto'
@@ -86,6 +87,12 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
       setKeys(null)
       return
     }
+    // After 72 idle hours the remembered key is dropped and the passphrase is needed again.
+    if (idleExpired(lastActive(memberId))) {
+      await forgetPrivateKey(memberId)
+      setKeys(null)
+      return
+    }
     // Reuse the in-memory key, else a remembered one; otherwise the vault stays locked.
     const privateKey = keysRef.current?.privateKey ?? (await loadPrivateKey(memberId, s.keys.publicKey))
     if (privateKey && (await keysMatch(s.keys.publicKey, privateKey))) {
@@ -100,6 +107,35 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
     setLoading(true)
     reload().finally(() => setLoading(false))
   }, [memberId, reload])
+
+  // While unlocked, any interaction counts as activity. Each check first locks if the vault has
+  // already been idle too long (e.g. a tab left open for days), then records the activity.
+  const unlocked = !!keys
+  useEffect(() => {
+    if (!memberId || !unlocked) return
+    let written = 0
+    const check = (active: boolean) => {
+      const now = Date.now()
+      if (idleExpired(lastActive(memberId), now)) {
+        setKeys(null)
+        void forgetPrivateKey(memberId)
+        return
+      }
+      if (active && now - written > 60_000) {
+        written = now
+        markActive(memberId, now)
+      }
+    }
+    const onActivity = () => check(document.visibilityState === 'visible')
+    const events = ['pointerdown', 'keydown', 'visibilitychange'] as const
+    events.forEach((e) => window.addEventListener(e, onActivity, { passive: true }))
+    const timer = setInterval(() => check(false), 60_000)
+    check(true)
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, onActivity))
+      clearInterval(timer)
+    }
+  }, [memberId, unlocked, setKeys])
 
   const value = useMemo<VaultContextValue>(() => {
     const status: VaultStatus = !memberId
@@ -141,6 +177,7 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
           wrappedGroupKey = await wrapForMember(groupKey, publicKey)
         }
         await setupVault({ data: { ...bundle, wrappedGroupKey } })
+        markActive(memberId)
         if (remember) await savePrivateKey(memberId, bundle.publicKey, privateKey)
         const fresh = await getVaultState()
         setState(fresh)
@@ -158,6 +195,7 @@ export function VaultProvider({ memberId, children }: { memberId: number | null;
         if (!(await keysMatch(state.keys.publicKey, privateKey))) {
           throw new Error('Your vault keys don’t match what the server sent. Don’t save logins until an admin checks the deployment.')
         }
+        markActive(memberId)
         if (remember) await savePrivateKey(memberId, state.keys.publicKey, privateKey)
         setKeys({ privateKey, ...(await openGroupKey(state, privateKey)) })
       },

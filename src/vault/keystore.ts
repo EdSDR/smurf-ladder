@@ -41,6 +41,14 @@ export async function savePrivateKey(memberId: number, publicKey: string, key: C
   }
 }
 
+/** Drops this member's remembered private key but keeps the trusted group-key fingerprint. */
+export async function forgetPrivateKey(memberId: number) {
+  const prefix = `member:${memberId}:`
+  try {
+    await tx('readwrite', (s) => s.delete(IDBKeyRange.bound(prefix, `${prefix}￿`)))
+  } catch {}
+}
+
 export async function forgetKeys() {
   try {
     await tx('readwrite', (s) => s.clear())

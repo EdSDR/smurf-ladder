@@ -8,7 +8,7 @@ export function RememberDevice({ checked, onChange }: { checked: boolean; onChan
   return (
     <label className="flex items-start gap-2 text-sm text-muted-foreground">
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-1 accent-[var(--bone)]" />
-      <span>Remember on this device. Your key stays in this browser and can't be copied out of it.</span>
+      <span>Remember on this device. Your key stays in this browser and can't be copied out of it. It locks again after 3 days without using the site.</span>
     </label>
   )
 }
