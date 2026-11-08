@@ -20,10 +20,10 @@
 			"migrations_dir": "drizzle"
 		}
 	],
-	// Refresh the stalest accounts every 5 minutes (free plan: 50 subrequests per run).
+	// Every 2 minutes: due accounts first, then match-history backfill (free plan: 50 subrequests and 50 D1 queries per run).
 	"triggers": {
 		"crons": [
-			"*/5 * * * *"
+			"*/2 * * * *"
 		]
 	},
 	"vars": {

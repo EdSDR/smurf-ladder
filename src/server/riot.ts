@@ -1,5 +1,7 @@
 import { env } from 'cloudflare:workers'
 import { UserError } from '#/lib/errors'
+import type { RiotMatch } from '#/lib/match'
+import type { LiveGame } from '#/db/schema'
 
 export class RiotError extends UserError {
   constructor(
@@ -20,8 +22,11 @@ export type LeagueEntry = {
   wins: number
   losses: number
 }
-type ActiveGame = { gameStartTime: number }
-type Match = { info: { gameEndTimestamp?: number; gameCreation: number } }
+type ActiveGame = {
+  gameStartTime: number
+  gameQueueConfigId: number
+  participants: { puuid: string | null; riotId?: string; championId: number; teamId: number; spell1Id: number; spell2Id: number }[]
+}
 
 async function riot<T>(host: 'platform' | 'region', path: string): Promise<T | null> {
   const base = host === 'platform' ? env.RIOT_PLATFORM : env.RIOT_REGION
@@ -61,25 +66,38 @@ export async function leagueEntries(puuid: string) {
   return (await riot<LeagueEntry[]>('platform', `/lol/league/v4/entries/by-puuid/${enc(puuid)}`)) ?? []
 }
 
-/** Returns the game's start time, or null when the player isn't in a game. */
-export async function activeGameStart(puuid: string) {
+/** The live game the player is in right now, or null. Stored by Riot ID, never PUUID. */
+export async function activeGame(puuid: string): Promise<LiveGame | null> {
   const game = await riot<ActiveGame>('platform', `/lol/spectator/v5/active-games/by-summoner/${enc(puuid)}`)
-  return game ? game.gameStartTime || Date.now() : null
+  if (!game) return null
+  const self = game.participants.find((p) => p.puuid === puuid)
+  return {
+    startedAt: game.gameStartTime || Date.now(),
+    queueId: game.gameQueueConfigId,
+    championId: self?.championId ?? 0,
+    teams: game.participants.map((p) => ({
+      team: p.teamId,
+      name: p.riotId ?? '',
+      champion: p.championId,
+      spells: [p.spell1Id, p.spell2Id],
+      self: p.puuid === puuid,
+    })),
+  }
 }
 
 export const QUEUE_IDS = { solo: 420, flex: 440 } as const
 
-/** Ranked match IDs in one queue since `since` (ms), newest first. */
-export async function rankedMatchIds(puuid: string, queue: keyof typeof QUEUE_IDS, since: number) {
-  const startTime = Math.floor(since / 1000)
-  return (
-    (await riot<string[]>('region', `/lol/match/v5/matches/by-puuid/${enc(puuid)}/ids?queue=${QUEUE_IDS[queue]}&startTime=${startTime}&count=100`)) ?? []
-  )
+/** Ranked match IDs, newest first. Without a queue, both ranked queues are listed. */
+export async function matchIds(puuid: string, opts: { queue?: keyof typeof QUEUE_IDS; since?: number; count: number }) {
+  const q = new URLSearchParams({ count: String(opts.count) })
+  if (opts.queue) q.set('queue', String(QUEUE_IDS[opts.queue]))
+  else q.set('type', 'ranked')
+  if (opts.since) q.set('startTime', String(Math.floor(opts.since / 1000)))
+  return (await riot<string[]>('region', `/lol/match/v5/matches/by-puuid/${enc(puuid)}/ids?${q}`)) ?? []
 }
 
-export async function matchEndedAt(matchId: string) {
-  const match = await riot<Match>('region', `/lol/match/v5/matches/${enc(matchId)}`)
-  return match ? (match.info.gameEndTimestamp ?? match.info.gameCreation) : null
+export function match(matchId: string) {
+  return riot<RiotMatch>('region', `/lol/match/v5/matches/${enc(matchId)}`)
 }
 
 /** Accepts "Name#TAG"; Riot IDs allow spaces in the name. */

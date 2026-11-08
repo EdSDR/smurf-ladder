@@ -1,0 +1,465 @@
+{
+ "metadata": {
+  "matchId": "BR1_1000000001"
+ },
+ "info": {
+  "queueId": 420,
+  "gameDuration": 1572,
+  "gameVersion": "16.21.834.2754",
+  "gameCreation": 1793463274751,
+  "gameStartTimestamp": 1793463329672,
+  "gameEndTimestamp": 1793464902061,
+  "teams": [
+   {
+    "teamId": 100,
+    "win": true
+   },
+   {
+    "teamId": 200,
+    "win": false
+   }
+  ],
+  "participants": [
+   {
+    "championId": 82,
+    "champLevel": 17,
+    "teamId": 100,
+    "teamPosition": "TOP",
+    "individualPosition": "TOP",
+    "kills": 4,
+    "deaths": 4,
+    "assists": 5,
+    "totalMinionsKilled": 212,
+    "neutralMinionsKilled": 0,
+    "goldEarned": 11425,
+    "totalDamageDealtToChampions": 17094,
+    "visionScore": 18,
+    "win": true,
+    "summoner1Id": 4,
+    "summoner2Id": 3,
+    "gameEndedInEarlySurrender": false,
+    "item0": 2510,
+    "item1": 4633,
+    "item2": 2421,
+    "item3": 1120,
+    "item4": 1058,
+    "item5": 3047,
+    "item6": 3363,
+    "puuid": "test-puuid-1",
+    "riotIdGameName": "Player 1",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8000,
+       "selections": [
+        {
+         "perk": 8010
+        }
+       ]
+      },
+      {
+       "style": 8400
+      }
+     ]
+    }
+   },
+   {
+    "championId": 113,
+    "champLevel": 15,
+    "teamId": 100,
+    "teamPosition": "JUNGLE",
+    "individualPosition": "JUNGLE",
+    "kills": 7,
+    "deaths": 3,
+    "assists": 12,
+    "totalMinionsKilled": 23,
+    "neutralMinionsKilled": 139,
+    "goldEarned": 12060,
+    "totalDamageDealtToChampions": 14369,
+    "visionScore": 25,
+    "win": true,
+    "summoner1Id": 11,
+    "summoner2Id": 4,
+    "gameEndedInEarlySurrender": false,
+    "item0": 3047,
+    "item1": 3084,
+    "item2": 3109,
+    "item3": 3050,
+    "item4": 3067,
+    "item5": 1031,
+    "item6": 3364,
+    "puuid": "test-puuid-2",
+    "riotIdGameName": "Player 2",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8400,
+       "selections": [
+        {
+         "perk": 8439
+        }
+       ]
+      },
+      {
+       "style": 8100
+      }
+     ]
+    }
+   },
+   {
+    "championId": 777,
+    "champLevel": 15,
+    "teamId": 100,
+    "teamPosition": "MIDDLE",
+    "individualPosition": "MIDDLE",
+    "kills": 5,
+    "deaths": 6,
+    "assists": 2,
+    "totalMinionsKilled": 153,
+    "neutralMinionsKilled": 8,
+    "goldEarned": 9843,
+    "totalDamageDealtToChampions": 14452,
+    "visionScore": 14,
+    "win": true,
+    "summoner1Id": 4,
+    "summoner2Id": 3,
+    "gameEndedInEarlySurrender": false,
+    "item0": 1086,
+    "item1": 6673,
+    "item2": 3172,
+    "item3": 3153,
+    "item4": 1018,
+    "item5": 2055,
+    "item6": 3363,
+    "puuid": "test-puuid-3",
+    "riotIdGameName": "Player 3",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8000,
+       "selections": [
+        {
+         "perk": 8008
+        }
+       ]
+      },
+      {
+       "style": 8400
+      }
+     ]
+    }
+   },
+   {
+    "championId": 804,
+    "champLevel": 15,
+    "teamId": 100,
+    "teamPosition": "BOTTOM",
+    "individualPosition": "BOTTOM",
+    "kills": 16,
+    "deaths": 2,
+    "assists": 5,
+    "totalMinionsKilled": 257,
+    "neutralMinionsKilled": 16,
+    "goldEarned": 19112,
+    "totalDamageDealtToChampions": 40784,
+    "visionScore": 32,
+    "win": true,
+    "summoner1Id": 4,
+    "summoner2Id": 21,
+    "gameEndedInEarlySurrender": false,
+    "item0": 1086,
+    "item1": 3036,
+    "item2": 6672,
+    "item3": 3031,
+    "item4": 3085,
+    "item5": 6670,
+    "item6": 3363,
+    "puuid": "test-puuid-4",
+    "riotIdGameName": "Player 4",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8000,
+       "selections": [
+        {
+         "perk": 8008
+        }
+       ]
+      },
+      {
+       "style": 8300
+      }
+     ]
+    }
+   },
+   {
+    "championId": 117,
+    "champLevel": 14,
+    "teamId": 100,
+    "teamPosition": "UTILITY",
+    "individualPosition": "UTILITY",
+    "kills": 3,
+    "deaths": 2,
+    "assists": 19,
+    "totalMinionsKilled": 21,
+    "neutralMinionsKilled": 0,
+    "goldEarned": 9205,
+    "totalDamageDealtToChampions": 6807,
+    "visionScore": 80,
+    "win": true,
+    "summoner1Id": 4,
+    "summoner2Id": 7,
+    "gameEndedInEarlySurrender": false,
+    "item0": 3870,
+    "item1": 3222,
+    "item2": 3109,
+    "item3": 1052,
+    "item4": 3504,
+    "item5": 2422,
+    "item6": 3364,
+    "puuid": "test-puuid-5",
+    "riotIdGameName": "Player 5",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8200,
+       "selections": [
+        {
+         "perk": 8214
+        }
+       ]
+      },
+      {
+       "style": 8300
+      }
+     ]
+    }
+   },
+   {
+    "championId": 24,
+    "champLevel": 15,
+    "teamId": 200,
+    "teamPosition": "TOP",
+    "individualPosition": "TOP",
+    "kills": 2,
+    "deaths": 7,
+    "assists": 2,
+    "totalMinionsKilled": 203,
+    "neutralMinionsKilled": 0,
+    "goldEarned": 9879,
+    "totalDamageDealtToChampions": 14881,
+    "visionScore": 15,
+    "win": false,
+    "summoner1Id": 14,
+    "summoner2Id": 4,
+    "gameEndedInEarlySurrender": false,
+    "item0": 1086,
+    "item1": 1052,
+    "item2": 1029,
+    "item3": 1001,
+    "item4": 6692,
+    "item5": 3078,
+    "item6": 3340,
+    "puuid": "test-puuid-6",
+    "riotIdGameName": "Player 6",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8100,
+       "selections": [
+        {
+         "perk": 9923
+        }
+       ]
+      },
+      {
+       "style": 8300
+      }
+     ]
+    }
+   },
+   {
+    "championId": 887,
+    "champLevel": 14,
+    "teamId": 200,
+    "teamPosition": "JUNGLE",
+    "individualPosition": "JUNGLE",
+    "kills": 5,
+    "deaths": 6,
+    "assists": 2,
+    "totalMinionsKilled": 6,
+    "neutralMinionsKilled": 156,
+    "goldEarned": 10137,
+    "totalDamageDealtToChampions": 21569,
+    "visionScore": 28,
+    "win": false,
+    "summoner1Id": 11,
+    "summoner2Id": 6,
+    "gameEndedInEarlySurrender": false,
+    "item0": 4633,
+    "item1": 1058,
+    "item2": 2055,
+    "item3": 2510,
+    "item4": 0,
+    "item5": 3047,
+    "item6": 3364,
+    "puuid": "test-puuid-7",
+    "riotIdGameName": "Player 7",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8000,
+       "selections": [
+        {
+         "perk": 8010
+        }
+       ]
+      },
+      {
+       "style": 8400
+      }
+     ]
+    }
+   },
+   {
+    "championId": 236,
+    "champLevel": 15,
+    "teamId": 200,
+    "teamPosition": "MIDDLE",
+    "individualPosition": "MIDDLE",
+    "kills": 4,
+    "deaths": 5,
+    "assists": 3,
+    "totalMinionsKilled": 236,
+    "neutralMinionsKilled": 0,
+    "goldEarned": 12350,
+    "totalDamageDealtToChampions": 22636,
+    "visionScore": 21,
+    "win": false,
+    "summoner1Id": 4,
+    "summoner2Id": 14,
+    "gameEndedInEarlySurrender": false,
+    "item0": 1086,
+    "item1": 3508,
+    "item2": 3071,
+    "item3": 3174,
+    "item4": 6675,
+    "item5": 1018,
+    "item6": 3363,
+    "puuid": "test-puuid-8",
+    "riotIdGameName": "Player 8",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8000,
+       "selections": [
+        {
+         "perk": 8005
+        }
+       ]
+      },
+      {
+       "style": 8300
+      }
+     ]
+    }
+   },
+   {
+    "championId": 110,
+    "champLevel": 13,
+    "teamId": 200,
+    "teamPosition": "BOTTOM",
+    "individualPosition": "BOTTOM",
+    "kills": 5,
+    "deaths": 10,
+    "assists": 2,
+    "totalMinionsKilled": 191,
+    "neutralMinionsKilled": 0,
+    "goldEarned": 12603,
+    "totalDamageDealtToChampions": 22575,
+    "visionScore": 20,
+    "win": false,
+    "summoner1Id": 12,
+    "summoner2Id": 4,
+    "gameEndedInEarlySurrender": false,
+    "item0": 1086,
+    "item1": 3042,
+    "item2": 6695,
+    "item3": 3142,
+    "item4": 6694,
+    "item5": 0,
+    "item6": 3363,
+    "puuid": "test-puuid-9",
+    "riotIdGameName": "Player 9",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8200,
+       "selections": [
+        {
+         "perk": 8229
+        }
+       ]
+      },
+      {
+       "style": 8300
+      }
+     ]
+    }
+   },
+   {
+    "championId": 161,
+    "champLevel": 12,
+    "teamId": 200,
+    "teamPosition": "UTILITY",
+    "individualPosition": "UTILITY",
+    "kills": 1,
+    "deaths": 7,
+    "assists": 4,
+    "totalMinionsKilled": 59,
+    "neutralMinionsKilled": 0,
+    "goldEarned": 7850,
+    "totalDamageDealtToChampions": 23358,
+    "visionScore": 69,
+    "win": false,
+    "summoner1Id": 4,
+    "summoner2Id": 7,
+    "gameEndedInEarlySurrender": false,
+    "item0": 3869,
+    "item1": 1029,
+    "item2": 3916,
+    "item3": 3145,
+    "item4": 6655,
+    "item5": 3020,
+    "item6": 3364,
+    "puuid": "test-puuid-10",
+    "riotIdGameName": "Player 10",
+    "riotIdTagline": "TEST",
+    "perks": {
+     "styles": [
+      {
+       "style": 8200,
+       "selections": [
+        {
+         "perk": 8229
+        }
+       ]
+      },
+      {
+       "style": 8000
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

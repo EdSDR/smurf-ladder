@@ -1,4 +1,7 @@
 import { sql } from 'drizzle-orm'
+import type { LpGains } from '#/lib/lpStats'
+import type { MatchParticipant } from '#/lib/match'
+import type { ChampStat, Summary } from '#/lib/matchStats'
 import {
   index,
   integer,
@@ -25,6 +28,9 @@ export const members = sqliteTable('members', {
   kdfSalt: text('kdf_salt'),
   kdfIters: integer('kdf_iters'),
   wrapIv: text('wrap_iv'),
+  // Profile: banner splash (defaults to most played champion) and a short tagline.
+  bannerChampionId: integer('banner_champion_id'),
+  tagline: text('tagline'),
   createdAt: integer('created_at').notNull().default(now),
 })
 
@@ -91,6 +97,14 @@ export const accounts = sqliteTable(
     soloDecayPending: integer('solo_decay_pending', { mode: 'boolean' }).notNull().default(false),
     flexDecayPending: integer('flex_decay_pending', { mode: 'boolean' }).notNull().default(false),
     inGameSince: integer('in_game_since'),
+    liveGame: text('live_game', { mode: 'json' }).$type<LiveGame>(),
+    // Match history sync: IDs waiting to be fetched (newest first), and games already listed.
+    matchBacklog: text('match_backlog', { mode: 'json' }).$type<string[]>().notNull().default(sql`'[]'`),
+    backfillState: text('backfill_state', { enum: ['todo', 'listed', 'done'] }).notNull().default('todo'),
+    soloSyncedGames: integer('solo_synced_games').notNull().default(0),
+    flexSyncedGames: integer('flex_synced_games').notNull().default(0),
+    syncRetryUntil: integer('sync_retry_until').notNull().default(0),
+    lastGameAt: integer('last_game_at'),
     refreshedAt: integer('refreshed_at').notNull().default(0),
     riotIdCheckedAt: integer('riot_id_checked_at').notNull().default(0),
     createdAt: integer('created_at').notNull().default(now),
@@ -144,5 +158,84 @@ export const rankedGames = sqliteTable(
   (t) => [primaryKey({ columns: [t.accountId, t.matchId] })],
 )
 
+/** A ranked game, shared by every tracked account that played in it. */
+export const matches = sqliteTable(
+  'matches',
+  {
+    matchId: text('match_id').primaryKey(),
+    queueId: integer('queue_id').notNull(),
+    startedAt: integer('started_at').notNull(),
+    endedAt: integer('ended_at').notNull(),
+    durationS: integer('duration_s').notNull(),
+    patch: text('patch').notNull(),
+    remake: integer('remake', { mode: 'boolean' }).notNull(),
+    winnerTeam: integer('winner_team'),
+    participants: text('participants', { mode: 'json' }).$type<MatchParticipant[]>().notNull(),
+  },
+  (t) => [index('matches_ended_idx').on(t.endedAt)],
+)
+
+/** One tracked account's line in a match, copied out so lists don't parse the lobby JSON. */
+export const matchPlayers = sqliteTable(
+  'match_players',
+  {
+    accountId: integer('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    matchId: text('match_id')
+      .notNull()
+      .references(() => matches.matchId, { onDelete: 'cascade' }),
+    queue: text('queue', { enum: ['solo', 'flex'] }).notNull(),
+    endedAt: integer('ended_at').notNull(),
+    durationS: integer('duration_s').notNull(),
+    remake: integer('remake', { mode: 'boolean' }).notNull(),
+    win: integer('win', { mode: 'boolean' }).notNull(),
+    championId: integer('champion_id').notNull(),
+    position: text('position'),
+    kills: integer('kills').notNull(),
+    deaths: integer('deaths').notNull(),
+    assists: integer('assists').notNull(),
+    cs: integer('cs').notNull(),
+    score: real('score'),
+    placement: integer('placement'),
+    badge: text('badge', { enum: ['MVP', 'ACE'] }),
+    lpChange: integer('lp_change'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.accountId, t.matchId] }),
+    index('match_players_account_idx').on(t.accountId, t.endedAt),
+    index('match_players_score_idx').on(t.score),
+  ],
+)
+
+/** Precomputed per-account numbers so list pages never scan match history. */
+export const accountStats = sqliteTable('account_stats', {
+  accountId: integer('account_id')
+    .primaryKey()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  mainRole: text('main_role'),
+  champStats: text('champ_stats', { mode: 'json' }).$type<ChampStat[]>().notNull(),
+  last20: text('last20', { mode: 'json' }).$type<Summary>().notNull(),
+  storedGames: integer('stored_games').notNull().default(0),
+  lp: text('lp', { mode: 'json' }).$type<{ solo: LpGains | null; flex: LpGains | null }>(),
+  lpUpdatedAt: integer('lp_updated_at').notNull().default(0),
+  updatedAt: integer('updated_at').notNull().default(now),
+})
+
+/** Small shared values refreshed on a schedule, like the champion list from the community CDN. */
+export const appMeta = sqliteTable('app_meta', {
+  key: text('key').primaryKey(),
+  value: text('value', { mode: 'json' }).notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})
+
+export type LiveGame = {
+  startedAt: number
+  queueId: number
+  championId: number
+  teams: { team: number; name: string; champion: number; spells: [number, number]; self: boolean }[]
+}
+
 export type Member = typeof members.$inferSelect
 export type Account = typeof accounts.$inferSelect
+export type MatchPlayer = typeof matchPlayers.$inferSelect

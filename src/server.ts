@@ -45,7 +45,7 @@ export default {
     return secured
   },
   async scheduled(_controller, _env, ctx) {
-    ctx.waitUntil(refreshStalest().then((n) => console.log(`cron refreshed ${n} accounts`)))
+    ctx.waitUntil(refreshStalest().then((r) => console.log("cron", JSON.stringify(r))))
     ctx.waitUntil(purgeExpiredSessions())
   },
 } satisfies ExportedHandler<Env>

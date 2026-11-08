@@ -14,7 +14,7 @@ import {
   requireAccount,
 } from './accounts.server'
 import * as riot from './riot'
-import { Budget, refreshAccount } from './refresh'
+import { refreshOne } from './refresh'
 import { memberMiddleware } from './middleware'
 import { getSessionMember } from './session'
 
@@ -90,7 +90,7 @@ export const addAccount = createServerFn({ method: 'POST' })
     if (!account) throw new UserError('That account is already on the ladder.')
     if (data.credential) await db.insert(schema.credentials).values({ accountId: account.id, ...data.credential })
     // Lookup and summoner calls already used a few requests of this invocation's 50.
-    await refreshAccount(account, new Budget(44))
+    await refreshOne(account, 44)
     return { id: account.id }
   })
 
@@ -169,5 +169,5 @@ export const refreshNow = createServerFn({ method: 'POST' })
     const account = await requireAccount(data.accountId)
     const wait = account.refreshedAt + REFRESH_COOLDOWN_MS - Date.now()
     if (wait > 0) throw new UserError(`Refreshed moments ago. Try again in ${Math.ceil(wait / 1000)}s.`)
-    await refreshAccount(account, new Budget(45))
+    await refreshOne(account, 45)
   })
