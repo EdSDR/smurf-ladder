@@ -1,4 +1,4 @@
-import { asc, eq } from 'drizzle-orm'
+import { and, asc, desc, eq, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import { UserError } from '#/lib/errors'
 import type { Account, Member } from '#/db/schema'
@@ -142,3 +142,38 @@ export async function assertSealedCorrectly(shared: boolean, cred: SealedInput |
     throw new UserError('This login wasn’t encrypted as private. Reload and save again.')
   }
 }
+
+export const MATCH_PAGE = 20
+
+/** A page of an account's games with their full lobbies, newest first. */
+export async function matchPage(accountId: number, before: number | null) {
+  const db = getDb()
+  const rows = await db
+    .select({ player: schema.matchPlayers, match: schema.matches })
+    .from(schema.matchPlayers)
+    .innerJoin(schema.matches, eq(schema.matches.matchId, schema.matchPlayers.matchId))
+    .where(before ? and(eq(schema.matchPlayers.accountId, accountId), lt(schema.matchPlayers.endedAt, before)) : eq(schema.matchPlayers.accountId, accountId))
+    .orderBy(desc(schema.matchPlayers.endedAt))
+    .limit(MATCH_PAGE)
+  return rows.map(({ player, match }) => ({
+    matchId: player.matchId,
+    queue: player.queue,
+    endedAt: player.endedAt,
+    durationS: player.durationS,
+    remake: player.remake,
+    win: player.win,
+    lpChange: player.lpChange,
+    championId: player.championId,
+    position: player.position,
+    kills: player.kills,
+    deaths: player.deaths,
+    assists: player.assists,
+    cs: player.cs,
+    score: player.score,
+    placement: player.placement,
+    badge: player.badge,
+    patch: match.patch,
+    participants: match.participants,
+  }))
+}
+export type MatchEntry = Awaited<ReturnType<typeof matchPage>>[number]

@@ -4,10 +4,12 @@ import { z } from 'zod'
 import { UserError } from '#/lib/errors'
 import { input } from '#/lib/validate'
 import { getDb, schema } from '#/db'
+import { rankScore } from '#/lib/tiers'
 import {
   REFRESH_COOLDOWN_MS,
   assertOwner,
   assertSealedCorrectly,
+  matchPage,
   memberAccounts,
   publicAccounts,
   queue,
@@ -100,25 +102,50 @@ export const getAccountDetail = createServerFn({ method: 'GET' })
   .middleware([memberMiddleware])
   .validator(input(accountIdInput))
   .handler(async ({ data }) => {
+    const db = getDb()
     const all = await memberAccounts()
     const account = all.find((a) => a.id === data.accountId)
     if (!account) throw new UserError('That account no longer exists.')
-    const history = await getDb()
-      .select({
-        queue: schema.rankSnapshots.queue,
-        tier: schema.rankSnapshots.tier,
-        rank: schema.rankSnapshots.rank,
-        lp: schema.rankSnapshots.lp,
-        wins: schema.rankSnapshots.wins,
-        losses: schema.rankSnapshots.losses,
-        takenAt: schema.rankSnapshots.takenAt,
-      })
-      .from(schema.rankSnapshots)
-      .where(eq(schema.rankSnapshots.accountId, data.accountId))
-      .orderBy(desc(schema.rankSnapshots.takenAt))
-      .limit(200)
-    return { account, history: history.reverse() }
+    const [history, [stats], [row], page] = await Promise.all([
+      db
+        .select({
+          queue: schema.rankSnapshots.queue,
+          tier: schema.rankSnapshots.tier,
+          rank: schema.rankSnapshots.rank,
+          lp: schema.rankSnapshots.lp,
+          wins: schema.rankSnapshots.wins,
+          losses: schema.rankSnapshots.losses,
+          takenAt: schema.rankSnapshots.takenAt,
+        })
+        .from(schema.rankSnapshots)
+        .where(eq(schema.rankSnapshots.accountId, data.accountId))
+        .orderBy(desc(schema.rankSnapshots.takenAt))
+        .limit(300),
+      db.select().from(schema.accountStats).where(eq(schema.accountStats.accountId, data.accountId)),
+      db.select({ liveGame: schema.accounts.liveGame }).from(schema.accounts).where(eq(schema.accounts.id, data.accountId)),
+      matchPage(data.accountId, null),
+    ])
+    const solo = (a: (typeof all)[number]) => rankScore(a.solo?.tier ?? null, a.solo?.rank ?? null, a.solo?.lp ?? null)
+    const place = account.solo ? all.filter((a) => solo(a) > solo(account)).length + 1 : null
+    // Tracked accounts by Riot ID, so lobby lists can link to them.
+    const tracked = Object.fromEntries(all.map((a) => [`${a.gameName}#${a.tagLine}`.toLowerCase(), a.id]))
+    return {
+      account,
+      place,
+      groupSize: all.length,
+      history: history.reverse(),
+      champStats: stats?.champStats ?? [],
+      last20: stats?.last20 ?? null,
+      liveGame: row?.liveGame ?? null,
+      matches: page,
+      tracked,
+    }
   })
+
+export const getMatchPage = createServerFn({ method: 'GET' })
+  .middleware([memberMiddleware])
+  .validator(input(accountIdInput.extend({ before: z.number().int() })))
+  .handler(({ data }) => matchPage(data.accountId, data.before))
 
 /** Ciphertext only. Shared credentials go to any member, private ones only to their owner. */
 export const getCredential = createServerFn({ method: 'GET' })

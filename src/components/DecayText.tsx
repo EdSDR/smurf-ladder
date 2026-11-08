@@ -41,12 +41,10 @@ export function DecayText({
   return (
     <span className={cn(base, soon ? 'font-semibold text-foreground' : 'text-muted-foreground')} title={how}>
       {soon && <TriangleAlertIcon className="size-3.5" style={{ color: 'var(--tier-gold)' }} aria-hidden />}
-      Decays in {state.days} {state.days === 1 ? 'day' : 'days'}
-      {detailed && (
-        <span className="font-normal text-muted-foreground">
-          , {state.full ? 'bank full' : `about ${state.days} of ${rules.cap} days banked`}
-        </span>
-      )}
+      <span>
+        {`Decays in ${state.days} ${state.days === 1 ? 'day' : 'days'}`}
+        {detailed && <span className="font-normal text-muted-foreground">{state.full ? ', bank full' : `, about ${state.days} of ${rules.cap} days banked`}</span>}
+      </span>
     </span>
   )
 }
