@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import type { Account, MatchPlayer } from '#/db/schema'
-import { DECAY_WINDOW_DAYS, decayRules, estimateBank } from '#/lib/decay'
+import { DECAY_WINDOW_DAYS, decayRules, estimateBank, heldAtFloor } from '#/lib/decay'
 import { UserError } from '#/lib/errors'
 import { attributeLp, lpGains, type Peak, type SnapshotPoint } from '#/lib/lpStats'
 import { findParticipant, parseMatch, queueOf, type MatchParticipant, type ParsedMatch } from '#/lib/match'
@@ -249,7 +249,14 @@ async function deriveAccount(input: DerivedInput, ctx: RunContext, stmts: Stmt[]
           break
         }
       }
-      bank = estimateBank({ rules, games: ends, enteredTierAt: entered, now })
+      const estimate = estimateBank({ rules, games: ends, enteredTierAt: entered, now })
+      bank = estimate.days
+      // Snapshots are only written on change, so the newest one says how long the rank has held.
+      const last = queueSnaps.at(-1) ?? { ...queueState(account, queue), takenAt: 0 }
+      const floorAt = queue === 'solo' ? account.soloFloorAt : account.flexFloorAt
+      if (!pending && !(floorAt && floorAt >= SEASON_START) && heldAtFloor(last, estimate, last.takenAt, now)) {
+        Object.assign(update, queue === 'solo' ? { soloFloorAt: now } : { flexFloorAt: now })
+      }
     }
     if (queue === 'solo') Object.assign(update, { soloBank: bank, soloDecayPending: pending })
     else Object.assign(update, { flexBank: bank, flexDecayPending: pending })

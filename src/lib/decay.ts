@@ -22,35 +22,66 @@ export const DECAY_WINDOW_DAYS = 28
 const DAY = 86_400_000
 
 /**
- * Replays ranked games to estimate today's bank, in days.
+ * Riot runs decay once a day at 23:45 Brasília time (02:45 UTC; Brazil has no daylight saving).
+ * Each check takes one day from the bank, and the check that empties it, and every one after,
+ * costs LP. So a bank of 1 day means LP goes at the next check, not "already decaying".
+ */
+const CHECK_OFFSET = (2 * 60 + 45) * 60_000
+
+/** The first decay check strictly after `t`. */
+export function nextDecayCheck(t: number) {
+  return (Math.floor((t - CHECK_OFFSET) / DAY) + 1) * DAY + CHECK_OFFSET
+}
+
+/** Decay checks in (from, to]. */
+export function checksBetween(from: number, to: number) {
+  if (to <= from) return 0
+  return Math.floor((to - CHECK_OFFSET) / DAY) - Math.floor((from - CHECK_OFFSET) / DAY)
+}
+
+/** Whole days banked, and when the current run of LP losses began (null while the bank holds). */
+export type Bank = { days: number; decayingSince: number | null }
+
+/**
+ * Replays ranked games and daily checks to estimate today's bank.
  * - Starts empty at the window's start (an older bank would have drained by now).
  * - Promotion into the current tier group starts a full bank.
  */
-export function estimateBank(opts: { rules: DecayRules; games: number[]; enteredTierAt: number | null; now: number }): number {
+export function estimateBank(opts: { rules: DecayRules; games: number[]; enteredTierAt: number | null; now: number }): Bank {
   const { rules, now } = opts
   let t = now - DECAY_WINDOW_DAYS * DAY
-  let bank = 0
+  let days = 0
+  let decayingSince: number | null = null
   if (opts.enteredTierAt && opts.enteredTierAt > t) {
     t = opts.enteredTierAt
-    bank = rules.cap
+    days = rules.cap
+  }
+  const runChecks = (until: number) => {
+    for (let c = nextDecayCheck(t); c <= until; c += DAY) {
+      days = Math.max(0, days - 1)
+      if (days === 0) decayingSince ??= c
+    }
+    t = until
   }
   for (const g of [...opts.games].sort((a, b) => a - b)) {
     if (g < t || g > now) continue
-    bank = Math.max(0, bank - (g - t) / DAY)
-    bank = Math.min(rules.cap, bank + rules.perGame)
-    t = g
+    runChecks(g)
+    days = Math.min(rules.cap, days + rules.perGame)
+    decayingSince = null
   }
-  return Math.max(0, bank - (now - t) / DAY)
+  runChecks(now)
+  return { days, decayingSince }
 }
 
-/** The stored bank was computed at `asOf`; it keeps draining until the next refresh. */
+/** The stored bank was counted at `asOf`; each decay check since then took a day. */
 export function bankNow(bank: number, asOf: number, now = Date.now()) {
-  return Math.max(0, bank - (now - asOf) / DAY)
+  return Math.max(0, Math.floor(bank) - checksBetween(asOf, now))
 }
 
 /**
  * An account that reached Master or higher stops decaying at Diamond II 75 LP. We know it reached
- * Master from the season peak we've recorded.
+ * Master from the season peak we've recorded, or because it held at Diamond II 75 LP through a
+ * check that should have cost it LP (see heldAtFloor).
  */
 export const APEX_FLOOR = { tier: 'DIAMOND', rank: 'II', lp: 75 } as const
 const APEX_FLOOR_SCORE = rankScore(APEX_FLOOR.tier, APEX_FLOOR.rank, APEX_FLOOR.lp)
@@ -60,17 +91,31 @@ export function reachedApex(peakTier: string | null | undefined) {
 }
 
 /** True when the account sits at (or below) its floor, so decay can't take anything more. */
-export function atDecayFloor(tier: string | null | undefined, rank: string | null | undefined, lp: number, peakTier: string | null | undefined) {
-  if (!reachedApex(peakTier) || !tier || APEX.has(tier)) return false
+export function atDecayFloor(tier: string | null | undefined, rank: string | null | undefined, lp: number, reachedMaster: boolean) {
+  if (!reachedMaster || !tier || APEX.has(tier)) return false
   return rankScore(tier, rank ?? null, lp) <= APEX_FLOOR_SCORE
+}
+
+/** Riot can take a while to apply a check; only trust one that passed this long ago. */
+const CHECK_GRACE = 3 * 60 * 60_000
+
+/**
+ * An account at exactly Diamond II 75 LP whose bank was empty at a check, and that still hasn't
+ * moved since before that check, didn't lose LP when it should have: it's at its floor, so it
+ * reached Master this season even if we never saw it there.
+ */
+export function heldAtFloor(q: { tier: string | null; rank: string | null; lp: number | null }, bank: Bank, unchangedSince: number, now: number) {
+  if (q.tier !== APEX_FLOOR.tier || q.rank !== APEX_FLOOR.rank || q.lp !== APEX_FLOOR.lp || bank.decayingSince === null) return false
+  const lastCheck = nextDecayCheck(now - CHECK_GRACE) - DAY
+  return lastCheck >= bank.decayingSince && lastCheck > unchangedSince
 }
 
 export type DecayState =
   | { kind: 'none' }
   | { kind: 'pending' }
   | { kind: 'floor' }
-  | { kind: 'safe'; days: number; full: boolean; rules: DecayRules }
-  | { kind: 'decaying'; rules: DecayRules }
+  | { kind: 'safe'; days: number; msLeft: number; firstLossAt: number; full: boolean; rules: DecayRules }
+  | { kind: 'decaying'; nextLossAt: number; rules: DecayRules }
 
 export function decayState(
   tier: string | null | undefined,
@@ -78,19 +123,22 @@ export function decayState(
   asOf: number,
   pending: boolean,
   now = Date.now(),
-  floor?: { rank: string | null | undefined; lp: number; peakTier: string | null | undefined },
+  floor?: { rank: string | null | undefined; lp: number; reachedMaster: boolean },
 ): DecayState {
   const rules = decayRules(tier)
   if (!rules) return { kind: 'none' }
-  if (floor && atDecayFloor(tier, floor.rank, floor.lp, floor.peakTier)) return { kind: 'floor' }
+  if (floor && atDecayFloor(tier, floor.rank, floor.lp, floor.reachedMaster)) return { kind: 'floor' }
   if (pending || bank === null) return { kind: 'pending' }
   const left = bankNow(bank, asOf, now)
-  if (left < 1) return { kind: 'decaying', rules }
-  return { kind: 'safe', days: Math.floor(left), full: left > rules.cap - 1, rules }
+  const next = nextDecayCheck(now)
+  if (left < 1) return { kind: 'decaying', nextLossAt: next, rules }
+  const firstLossAt = next + (left - 1) * DAY
+  return { kind: 'safe', days: left, msLeft: firstLossAt - now, firstLossAt, full: left >= rules.cap, rules }
 }
 
 /** Flag accounts that will start losing LP within this many days. */
 export const DECAY_SOON_DAYS = 3
+export const DECAY_SOON_MS = DECAY_SOON_DAYS * DAY
 
 /**
  * Where decay ends and how long it takes to get there, if the account keeps not playing.
@@ -109,14 +157,14 @@ const DIVISIONS_DOWN: Record<string, { tier: string; rank: string }> = {
 }
 
 /** Days of decay until the next drop (division or tier), counted from when LP starts falling. */
-export function nextDecayDrop(tier: string | null | undefined, rank: string | null | undefined, lp: number, peakTier?: string | null): DecayDrop | null {
+export function nextDecayDrop(tier: string | null | undefined, rank: string | null | undefined, lp: number, reachedMaster = false): DecayDrop | null {
   const rules = decayRules(tier)
   if (!rules) return null
-  if (atDecayFloor(tier, rank, lp, peakTier)) return null
+  if (atDecayFloor(tier, rank, lp, reachedMaster)) return null
   const days = Math.max(1, Math.ceil(lp / rules.lpPerDay))
   if (rules.group === 'apex') return { tier: 'DIAMOND', rank: 'II', days, approxLp: 75 }
   // Accounts that reached Master stop at Diamond II 75 LP instead of falling further.
-  if (reachedApex(peakTier)) {
+  if (reachedMaster) {
     if (rank === 'II') return { tier: 'DIAMOND', rank: 'II', days: 1, approxLp: APEX_FLOOR.lp }
     if (rank === 'I') return { tier: 'DIAMOND', rank: 'II', days, approxLp: APEX_FLOOR.lp }
   }

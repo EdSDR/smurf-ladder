@@ -15,6 +15,13 @@
       "when": 1794096109415,
       "tag": "0001_match_history",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794193605435,
+      "tag": "0002_decay_floor",
+      "breakpoints": true
     }
   ]
 }

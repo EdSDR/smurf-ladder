@@ -96,6 +96,10 @@ export const accounts = sqliteTable(
     // True while older ranked games are still being fetched, so the bank isn't trustworthy yet.
     soloDecayPending: integer('solo_decay_pending', { mode: 'boolean' }).notNull().default(false),
     flexDecayPending: integer('flex_decay_pending', { mode: 'boolean' }).notNull().default(false),
+    // When the account held at Diamond II 75 LP through a decay check, which means it reached
+    // Master this season even if we never saw it there. Only counts for the current season.
+    soloFloorAt: integer('solo_floor_at'),
+    flexFloorAt: integer('flex_floor_at'),
     inGameSince: integer('in_game_since'),
     liveGame: text('live_game', { mode: 'json' }).$type<LiveGame>(),
     // Match history sync: IDs waiting to be fetched (newest first), and games already listed.

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import { UserError } from '#/lib/errors'
+import { SEASON_START } from '#/lib/season'
 import { rankScore } from '#/lib/tiers'
 import type { Account, Member } from '#/db/schema'
 import type { LpGains } from '#/lib/lpStats'
@@ -30,6 +31,8 @@ export type QueueRank = {
   /** Estimated decay bank in days as of refreshedAt; null below Diamond. */
   bank: number | null
   decayPending: boolean
+  /** Held at Diamond II 75 LP through a decay check this season, so it reached Master. */
+  heldFloor: boolean
 }
 
 export type MemberAccount = PublicAccount & {
@@ -53,8 +56,9 @@ export function queue(
   losses: number | null,
   bank: number | null = null,
   decayPending = false,
+  floorAt: number | null = null,
 ): QueueRank | null {
-  return tier ? { tier, rank, lp: lp ?? 0, wins: wins ?? 0, losses: losses ?? 0, bank, decayPending } : null
+  return tier ? { tier, rank, lp: lp ?? 0, wins: wins ?? 0, losses: losses ?? 0, bank, decayPending, heldFloor: !!floorAt && floorAt >= SEASON_START } : null
 }
 
 export function toPublic(a: Account): PublicAccount {
@@ -64,8 +68,8 @@ export function toPublic(a: Account): PublicAccount {
     tagLine: a.tagLine,
     iconId: a.iconId,
     level: a.level,
-    solo: queue(a.soloTier, a.soloRank, a.soloLp, a.soloWins, a.soloLosses, a.soloBank, a.soloDecayPending),
-    flex: queue(a.flexTier, a.flexRank, a.flexLp, a.flexWins, a.flexLosses, a.flexBank, a.flexDecayPending),
+    solo: queue(a.soloTier, a.soloRank, a.soloLp, a.soloWins, a.soloLosses, a.soloBank, a.soloDecayPending, a.soloFloorAt),
+    flex: queue(a.flexTier, a.flexRank, a.flexLp, a.flexWins, a.flexLosses, a.flexBank, a.flexDecayPending, a.flexFloorAt),
     inGame: !!a.inGameSince,
     refreshedAt: a.refreshedAt,
   }
