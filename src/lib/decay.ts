@@ -17,8 +17,15 @@ export function decayRules(tier: string | null | undefined): DecayRules | null {
   return null
 }
 
-/** How far back we look. Any bank older than this has fully drained, whatever it was. */
+/** How far back we list games when an account has none stored yet. */
 export const DECAY_WINDOW_DAYS = 28
+/**
+ * How far back we replay games. The bank before that is unknown, so the replay starts it empty.
+ * A short replay undercounts regular players (a Master bank carried over from earlier games), so
+ * we replay everything stored from this far back; the estimate settles once the bank hits 0 or
+ * the cap anywhere in that stretch.
+ */
+export const DECAY_REPLAY_DAYS = 90
 const DAY = 86_400_000
 
 /**
@@ -44,12 +51,12 @@ export type Bank = { days: number; decayingSince: number | null }
 
 /**
  * Replays ranked games and daily checks to estimate today's bank.
- * - Starts empty at the window's start (an older bank would have drained by now).
+ * - Starts empty DECAY_REPLAY_DAYS ago.
  * - Promotion into the current tier group starts a full bank.
  */
 export function estimateBank(opts: { rules: DecayRules; games: number[]; enteredTierAt: number | null; now: number }): Bank {
   const { rules, now } = opts
-  let t = now - DECAY_WINDOW_DAYS * DAY
+  let t = now - DECAY_REPLAY_DAYS * DAY
   let days = 0
   let decayingSince: number | null = null
   if (opts.enteredTierAt && opts.enteredTierAt > t) {

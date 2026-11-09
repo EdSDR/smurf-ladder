@@ -1,5 +1,5 @@
 import { TriangleAlertIcon } from 'lucide-react'
-import { APEX_FLOOR, DECAY_SOON_MS, DECAY_WINDOW_DAYS, decayState, nextDecayDrop, reachedApex } from '#/lib/decay'
+import { APEX_FLOOR, DECAY_REPLAY_DAYS, DECAY_SOON_MS, decayState, nextDecayDrop, reachedApex } from '#/lib/decay'
 import { formatRank } from '#/lib/tiers'
 import type { QueueRank } from '#/server/accounts.functions'
 import { cn } from '#/lib/utils'
@@ -65,7 +65,7 @@ export function DecayText({
   const { rules } = state
   const drop = q ? nextDecayDrop(q.tier, q.rank, q.lp, reachedMaster(q, peakTier)) : null
   const landing = drop ? `${formatRank(drop.tier, drop.rank)}${drop.approxLp ? ` (about ${drop.approxLp} LP)` : ''}` : null
-  const how = `Estimated from ${queueName[queue]} games in the last ${DECAY_WINDOW_DAYS} days. Each game adds ${rules.perGame} ${rules.perGame === 1 ? 'day' : 'days'}, up to ${rules.cap}. Riot checks decay every day at 23:45 Brasília time and uses one banked day; the check that empties the bank, and each one after it, takes ${rules.lpPerDay} LP${landing ? ` until it falls to ${landing}` : ''}. The client shows the exact number.`
+  const how = `Estimated from ${queueName[queue]} games in the last ${DECAY_REPLAY_DAYS} days. Each game adds ${rules.perGame} ${rules.perGame === 1 ? 'day' : 'days'}, up to ${rules.cap}. Riot checks decay every day at 23:45 Brasília time and uses one banked day; the check that empties the bank, and each one after it, takes ${rules.lpPerDay} LP${landing ? ` until it falls to ${landing}` : ''}. The client shows the exact number.`
 
   if (state.kind === 'decaying') {
     return (

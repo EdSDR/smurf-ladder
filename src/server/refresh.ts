@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lt } from 'drizzle-orm'
 import { getDb, schema } from '#/db'
 import type { Account, MatchPlayer } from '#/db/schema'
-import { DECAY_WINDOW_DAYS, decayRules, estimateBank, heldAtFloor } from '#/lib/decay'
+import { DECAY_REPLAY_DAYS, DECAY_WINDOW_DAYS, decayRules, estimateBank, heldAtFloor } from '#/lib/decay'
 import { UserError } from '#/lib/errors'
 import { attributeLp, lpGains, type Peak, type SnapshotPoint } from '#/lib/lpStats'
 import { findParticipant, parseMatch, queueOf, type MatchParticipant, type ParsedMatch } from '#/lib/match'
@@ -225,7 +225,7 @@ async function deriveAccount(input: DerivedInput, ctx: RunContext, stmts: Stmt[]
         db
           .select({ matchId: rankedGames.matchId, queue: rankedGames.queue, endedAt: rankedGames.endedAt })
           .from(rankedGames)
-          .where(and(eq(rankedGames.accountId, account.id), gte(rankedGames.endedAt, now - DECAY_WINDOW_DAYS * DAY))),
+          .where(and(eq(rankedGames.accountId, account.id), gte(rankedGames.endedAt, now - DECAY_REPLAY_DAYS * DAY))),
       )
     : []
   for (const queue of ['solo', 'flex'] as const) {

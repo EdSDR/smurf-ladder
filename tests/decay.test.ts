@@ -51,6 +51,12 @@ describe('estimateBank', () => {
     expect(estimateBank({ rules: master, games: before, enteredTierAt: now - 2 * DAY, now }).days).toBe(12)
   })
 
+  it('carries a Master bank built up more than 28 days ago', () => {
+    // Two games a day for 40 days keeps the 14-day bank full; three checks have passed since the last two.
+    const games = Array.from({ length: 80 }, (_, i) => now - 42 * DAY + Math.floor(i / 2) * DAY + (i % 2) * HOUR)
+    expect(estimateBank({ rules: master, games, enteredTierAt: null, now }).days).toBe(11)
+  })
+
   it('remembers the check where LP started going', () => {
     const lastGame = now - 3 * DAY // Master: 1 day banked, used up at the next check
     expect(estimateBank({ rules: master, games: [lastGame], enteredTierAt: null, now })).toEqual({ days: 0, decayingSince: tonight - 3 * DAY })
